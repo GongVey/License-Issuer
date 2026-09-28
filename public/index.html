@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>PhotoArchiver | License Office</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="masthead"><a href="/" class="brand">PhotoArchiver<span>LICENSE OFFICE</span></a><nav class="account-actions" aria-label="Account"><button id="open-account" class="quiet" aria-haspopup="dialog" aria-controls="account-panel" hidden>Account settings</button><button id="logout" class="quiet" hidden>Sign out</button></nav></header>
+  <main>
+    <p id="message" role="status" aria-live="polite"></p>
+    <section id="login" class="login-layout">
+      <div class="intro"><p class="eyebrow">PRIVATE ADMINISTRATION / PA1</p><h1>The archive.<br>The access.</h1><p>Issue machine-bound licenses from a single, secure office. Built for your desk and wherever work takes you.</p><div class="rule"></div><p class="small">Offline licenses. Server-side signing.<br>No private keys in your browser.</p></div>
+      <form id="login-form" class="panel"><p class="eyebrow">ADMINISTRATOR</p><h2>Sign in</h2><label for="username">Username</label><input id="username" name="username" autocomplete="username" required maxlength="80"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"><button type="submit">Enter license office</button><p class="small">An authorized administrator account is required.</p></form>
+    </section>
+    <section id="office" hidden>
+      <div class="page-heading"><div><p class="eyebrow">ISSUANCE REGISTER</p><h1>License office</h1></div><p class="small" id="identity"></p></div>
+      <div class="notice">Local management only. Archiving a record does not revoke or disable an offline client license.</div>
+      <p id="password-required" class="notice" hidden>Replace your temporary password in Account settings to access licenses.</p>
+      <div id="license-workspace" class="workspace">
+        <section id="issue-panel" class="panel issue-panel"><p class="eyebrow">01 / CREATE</p><h2>Issue a license</h2><form id="issue-form">
+          <label for="machine">Client machine code</label><textarea id="machine" name="machineFingerprint" rows="3" required maxlength="71" pattern="sha256:[a-f0-9]{64}" spellcheck="false" placeholder="sha256:..."></textarea><p class="hint">Paste the exact code shown by the client. Case is significant.</p>
+          <label for="edition">Edition</label><select id="edition" name="edition" required></select>
+          <label for="note">Customer / private note</label><textarea id="note" name="note" rows="3" maxlength="2000" placeholder="For your records only"></textarea>
+          <p class="small">A unique license ID and current Unix timestamp in milliseconds are assigned by the server. Notes are not included in the signed license.</p><button type="submit">Sign &amp; issue</button>
+        </form></section>
+        <section class="register"><div class="register-heading"><div><p class="eyebrow">02 / REGISTER</p><h2>Issued licenses</h2></div><span id="count" class="count"></span></div>
+          <form id="search-form" class="search"><label class="sr-only" for="search">Search licenses</label><input id="search" type="search" maxlength="200" placeholder="Machine, customer, ID or edition"><button type="submit" class="secondary">Search</button></form>
+          <div id="records" class="records"></div><div class="pagination"><button id="previous" class="quiet">Previous</button><span id="page" class="small"></span><button id="next" class="quiet">Next</button></div>
+        </section>
+      </div>
+      <details class="key-info"><summary>Signing public key</summary><code id="public-key"></code><p class="small">This public key must match the target client's effective verification key.</p></details>
+    </section>
+  </main>
+  <dialog id="account-panel" class="account-panel" aria-labelledby="account-title" aria-describedby="account-notice"><div class="dialog-heading"><p class="eyebrow">ACCOUNT SECURITY</p><button id="close-account" class="quiet" type="button" aria-label="Close account settings">Close</button></div><h2 id="account-title">Account settings</h2><p id="account-notice" class="hint"></p><p id="account-error" class="error" role="alert" hidden></p><form id="account-form"><label for="account-current">Current password</label><input id="account-current" type="password" autocomplete="current-password" required maxlength="256"><label for="account-username">Username</label><input id="account-username" autocomplete="username" required maxlength="80"><label for="account-password">New password</label><input id="account-password" type="password" autocomplete="new-password" minlength="16" maxlength="256" required><label for="account-confirm">Confirm new password</label><input id="account-confirm" type="password" autocomplete="new-password" minlength="16" maxlength="256" required><button type="submit">Save and sign in again</button></form></dialog>
+  <dialog id="detail"><div class="dialog-heading"><p class="eyebrow">LICENSE RECORD</p><button id="close-detail" class="quiet" aria-label="Close license details">Close</button></div><h2>License details</h2><dl id="fields"></dl><label for="license-code">Signed authorization code</label><textarea id="license-code" rows="6" readonly spellcheck="false"></textarea><div class="actions"><button id="copy-code">Copy license code</button><button id="archive" class="secondary"></button></div><p class="small">Local status is bookkeeping only. This code remains valid for its bound offline machine after archiving.</p></dialog>
+  <footer>PHOTOARCHIVER <span>PRIVATE LICENSE OPERATIONS</span></footer>
+</body>
+</html>

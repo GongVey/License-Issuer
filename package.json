@@ -1,0 +1,19 @@
+{
+  "name": "photoarchiver-license-issuer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24.15.0 <25" },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "build": "node --check server.mjs && node --check lib.mjs && node --check admin.mjs && node --check public/app.js",
+    "test": "node --test test/*.test.mjs",
+    "admin": "node --env-file-if-exists=.env admin.mjs",
+    "admin:init": "node --env-file-if-exists=.env admin.mjs init",
+    "admin:reset-password": "node --env-file-if-exists=.env admin.mjs reset-password",
+    "admin:rename": "node --env-file-if-exists=.env admin.mjs rename",
+    "admin:import-env": "node --env-file-if-exists=.env admin.mjs import-env",
+    "password-hash": "node admin.mjs password-hash",
+    "check-key": "node --env-file-if-exists=.env admin.mjs check-key"
+  }
+}

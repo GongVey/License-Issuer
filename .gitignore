@@ -1,0 +1,10 @@
+data/
+secrets/
+*.pem
+*.key
+*.p12
+*.sqlite*
+*.db*
+.env
+.env.*
+!.env.example

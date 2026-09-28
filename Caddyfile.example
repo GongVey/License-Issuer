@@ -1,0 +1,10 @@
+# Replace with your real DNS name and configure PUBLIC_ORIGIN to match.
+# Keep Node bound to 127.0.0.1. Only expose Caddy ports 80/443.
+licenses.example.com {
+    request_body {
+        max_size 16KB
+    }
+    reverse_proxy 127.0.0.1:8787 {
+        header_up Host {host}
+    }
+}
