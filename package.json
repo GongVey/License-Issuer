@@ -6,10 +6,11 @@
   "engines": { "node": ">=24.15.0 <25" },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
-    "build": "node --check server.mjs && node --check lib.mjs && node --check admin.mjs && node --check public/app.js",
+    "build": "node --check server.mjs && node --check lib.mjs && node --check cards.mjs && node --check admin.mjs && node --check public/app.js",
     "test": "node --test test/*.test.mjs",
     "admin": "node --env-file-if-exists=.env admin.mjs",
-    "admin:init": "node --env-file-if-exists=.env admin.mjs init",
+    "admin:init": "node --env-file-if-exists=.env admin.mjs init-default",
+    "admin:init-custom": "node --env-file-if-exists=.env admin.mjs init",
     "admin:reset-password": "node --env-file-if-exists=.env admin.mjs reset-password",
     "admin:rename": "node --env-file-if-exists=.env admin.mjs rename",
     "admin:import-env": "node --env-file-if-exists=.env admin.mjs import-env",

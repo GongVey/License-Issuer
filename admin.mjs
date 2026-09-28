@@ -1,12 +1,11 @@
-import { hashPassword, loadSigningKey, publicKeyFor, openDatabase, initializeAdministrator, importAdministrator, updateAdministrator, requireAdministrator, validateUsername } from './lib.mjs';
+import { hashPassword, loadSigningKey, publicKeyFor, openDatabase, initializeAdministrator, importAdministrator, updateAdministrator, requireAdministrator, validateUsername, ensureDefaultAdministrator } from './lib.mjs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
-import { randomBytes } from 'node:crypto';
 
 const help = `Usage: npm run admin -- <command>
   init            Initialize an empty administrator table (interactive username and hidden password confirmation)
-  init-default    Initialize an empty table as admin with a one-time random password
+  init-default    Initialize an empty table as admin / admin123; preserve existing accounts
   reset-password  Set a new hidden password; revoke all administrator sessions
   rename          Change username interactively; revoke all administrator sessions
   import-env      One-time import of explicit ADMIN_USERNAME and ADMIN_PASSWORD_HASH; empty table only
@@ -14,7 +13,7 @@ const help = `Usage: npm run admin -- <command>
   check-key       Validate the configured signing key
   --help          Show this help
 Account commands use only DATABASE_PATH (default ./data/issuer.sqlite), not signing keys.
-No shared default password, password arguments, public registration, or automatic ENV import.
+No password arguments, public registration, or automatic ENV import.
 Protect the database, backups and local CLI access with OS permissions.
 After import-env succeeds, remove ADMIN_USERNAME and ADMIN_PASSWORD_HASH from deployment secrets.`;
 
@@ -49,7 +48,7 @@ async function hiddenPrompt(label) {
 }
 export async function runAdmin(command, env, { askUsername = usernamePrompt, askPassword = hiddenPrompt, output = console.log } = {}) {
   const newHash = async () => {
-    const first = await askPassword('New administrator password (16-256 characters, hidden): ');
+    const first = await askPassword('New administrator password (nonempty, max 256 characters, hidden): ');
     const second = await askPassword('Confirm password (hidden): ');
     if (first !== second) throw new Error('Passwords do not match');
     return hashPassword(first);
@@ -65,10 +64,11 @@ export async function runAdmin(command, env, { askUsername = usernamePrompt, ask
       const username = validateUsername(await askUsername('New administrator username: '));
       initializeAdministrator(db, username, await newHash());
     } else if (command === 'init-default') {
-      if (db.prepare('SELECT 1 FROM administrators LIMIT 1').get()) throw new Error('Administrator already initialized');
-      const password = randomBytes(24).toString('base64url');
-      initializeAdministrator(db, 'admin', await hashPassword(password), true);
-      output(`Initial administrator username: admin\nInitial administrator password (show once): ${password}`);
+      if (!await ensureDefaultAdministrator(db)) {
+        output('Administrator already initialized; existing credentials are unchanged.');
+        return;
+      }
+      output('Initial administrator username: admin\nInitial administrator password: admin123');
     } else if (command === 'import-env') {
       importAdministrator(db, env);
     } else {

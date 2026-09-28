@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { generateKeyPairSync, randomBytes, sign } from 'node:crypto';
+import { generateKeyPairSync, randomBytes, sign, verify, createPublicKey } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { once } from 'node:events';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../server.mjs';
+import { productsFromEnv } from '../cards.mjs';
 import { runAdmin } from '../admin.mjs';
 import { DatabaseSync } from 'node:sqlite';
 import { CLIENT_PUBLIC_KEY, publicKeyFor, assertMatchingKey, hashPassword, verifyPassword, configFromEnv, issueLicense, openDatabase, allowLogin, initializeAdministrator, importAdministrator, updateAdministrator, requireAdministrator, createAdministratorSession } from '../lib.mjs';
@@ -17,6 +18,93 @@ const { privateKey } = generateKeyPairSync('ed25519');
 const machine = 'sha256:' + 'a'.repeat(64);
 const password = randomBytes(32).toString('base64url');
 const passwordHash = await hashPassword(password);
+
+test('product configuration validates stable identifiers', () => {
+  assert.deepEqual(productsFromEnv({}), ['photoarchiver', 'wallpaper']);
+  assert.deepEqual(productsFromEnv({ LICENSE_PRODUCTS: 'photoarchiver,custom,custom' }), ['photoarchiver', 'custom']);
+  assert.throws(() => productsFromEnv({ LICENSE_PRODUCTS: 'PhotoArchiver' }), /Invalid/);
+});
+
+test('cards activate online with product-bound offline signatures and two persistent device slots', async t => {
+  const f = await fixture(t);
+  assert.equal((await f.request('/api/cards')).status, 401);
+  await f.login();
+  assert.equal((await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard' }, { 'X-CSRF-Token': '' })).status, 403);
+  const created = await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard', note: 'Customer A' });
+  assert.equal(created.status, 201);
+  const card = created.body;
+  assert.equal(card.maxDevices, 2);
+  assert.match(card.cardCode, /^LIC-(?:[A-F0-9]{8}-){4}[A-F0-9]{8}$/);
+  const anonymous = { Cookie: '', 'X-CSRF-Token': '' };
+  const input = { cardCode: card.cardCode, productId: 'photoarchiver', machineFingerprint: machine };
+  assert.equal((await f.request('/api/v1/activate', 'POST', { ...input, productId: 'wallpaper' }, anonymous)).status, 404);
+  assert.equal((await f.request('/api/v1/activate', 'POST', input, { ...anonymous, Origin: 'https://attacker.example' })).status, 403);
+  // A native desktop client sends neither administrator credentials nor an Origin header.
+  const native = await fetch(f.config.origin + '/api/v1/activate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) });
+  assert.equal(native.status, 200);
+  const first = await native.json();
+  const [prefix, encoded, signature] = first.license.split('.');
+  assert.equal(prefix, 'GL1');
+  const bytes = Buffer.from(encoded, 'base64url');
+  const payload = JSON.parse(bytes);
+  assert.equal(payload.productId, 'photoarchiver');
+  assert.equal(payload.machineFingerprint, machine);
+  assert.equal(payload.cardId, card.cardId);
+  assert.equal(payload.version, 1);
+  assert.ok(verify(null, Buffer.concat([Buffer.from('GL1.'), bytes]), createPublicKey(privateKey), Buffer.from(signature, 'base64url')));
+  assert.ok(!verify(null, bytes, createPublicKey(privateKey), Buffer.from(signature, 'base64url')));
+  const changed = Buffer.from(JSON.stringify({ ...payload, productId: 'wallpaper' }));
+  assert.ok(!verify(null, Buffer.concat([Buffer.from('GL1.'), changed]), createPublicKey(privateKey), Buffer.from(signature, 'base64url')));
+  const repeat = await f.request('/api/v1/activate', 'POST', { ...input, cardCode: card.cardCode.toLowerCase() }, anonymous);
+  assert.equal(repeat.body.license, first.license);
+  assert.equal(repeat.body.usedDevices, 1);
+  const concurrent = await Promise.all(['b', 'c', 'd'].map(x => f.request('/api/v1/activate', 'POST', { ...input, machineFingerprint: 'sha256:' + x.repeat(64) }, anonymous)));
+  assert.deepEqual(concurrent.map(x => x.status).sort(), [200, 409, 409]);
+  const detail = (await f.request(`/api/cards/${card.cardId}`)).body;
+  assert.equal(detail.devices.length, 2);
+  assert.equal(detail.cardCode, undefined);
+  assert.equal(detail.codeHash, undefined);
+  assert.equal((await f.request('/api/cards?productId=wallpaper')).body.total, 0);
+  assert.equal((await f.request('/api/cards?q=Customer')).body.total, 1);
+  const dashboard = await f.request('/api/dashboard');
+  assert.equal(dashboard.status, 200);
+  assert.deepEqual(dashboard.body.totals, { total: 1, active: 1, disabled: 0, activations: 2 });
+  assert.equal((await f.request('/api/cards?status=disabled')).body.total, 0);
+  assert.equal((await f.request('/api/cards?status=active')).body.total, 1);
+  assert.equal((await f.request('/api/cards?q=%27%20OR%201%3D1')).body.total, 0);
+  const db = openDatabase(f.config.database);
+  assert.ok(!JSON.stringify(db.prepare('SELECT * FROM cards').all()).includes(card.cardCode));
+  db.close();
+  await f.request(`/api/cards/${card.cardId}`, 'PATCH', { status: 'disabled' });
+  assert.equal((await f.request('/api/v1/activate', 'POST', input, anonymous)).status, 403);
+  await f.restart();
+  assert.equal((await f.request(`/api/cards/${card.cardId}`)).body.status, 'disabled');
+  await f.request(`/api/cards/${card.cardId}`, 'PATCH', { status: 'active' });
+  assert.equal((await f.request('/api/v1/activate', 'POST', input, anonymous)).body.license, first.license);
+  const wallpaper = (await f.request('/api/cards', 'POST', { productId: 'wallpaper', edition: 'standard', maxDevices: 1 })).body;
+  const activated = await f.request('/api/v1/activate', 'POST', { ...input, productId: 'wallpaper', cardCode: wallpaper.cardCode }, anonymous);
+  assert.equal(activated.status, 200);
+  assert.equal(activated.body.productId, 'wallpaper');
+  assert.equal((await f.request('/api/v1/activate', 'POST', { ...input, productId: 'wallpaper', cardCode: wallpaper.cardCode, machineFingerprint: 'sha256:' + 'e'.repeat(64) }, anonymous)).status, 409);
+});
+
+test('card validation, activation throttling and admin login counters are independent', async t => {
+  const f = await fixture(t); await f.login();
+  for (const input of [{ productId: 'unknown', edition: 'standard' }, { productId: 'photoarchiver', edition: 'invalid' },
+    ...[0, 101, 1.5, '2', null].map(maxDevices => ({ productId: 'photoarchiver', edition: 'standard', maxDevices }))]) {
+    assert.equal((await f.request('/api/cards', 'POST', input)).status, 400);
+  }
+  const card = (await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard' })).body;
+  const input = { cardCode: card.cardCode, productId: 'photoarchiver', machineFingerprint: 'invalid' };
+  for (let i = 0; i < 60; i++) assert.equal((await f.request('/api/v1/activate', 'POST', input)).status, 400);
+  await f.restart();
+  assert.equal((await f.request('/api/v1/activate', 'POST', input)).status, 429);
+  await f.login();
+  f.advance(60001);
+  assert.equal((await f.request('/api/v1/activate', 'POST', { ...input, machineFingerprint: machine })).status, 200);
+  assert.equal((await f.request('/api/cards?offset=-1')).status, 400);
+  assert.equal((await f.request(`/api/cards/${card.cardId}`, 'PATCH', { status: 'archived' })).status, 400);
+});
 
 async function fixture(t, overrides = {}) {
   const directory = mkdtempSync(join(tmpdir(), 'pa-issuer-test-'));
@@ -92,7 +180,7 @@ test('interactive CLI initialization, confirmation, validation, persistence and 
   const prompts = { askUsername: async () => 'owner', askPassword: async () => password, output: text => output.push(text) };
   let count = 0;
   await assert.rejects(runAdmin('init', env, { ...prompts, askPassword: async () => ++count === 1 ? password : 'mismatch' }), /do not match/);
-  await assert.rejects(runAdmin('init', env, { ...prompts, askPassword: async () => 'short' }), /16 to 256/);
+  await assert.rejects(runAdmin('init', env, { ...prompts, askPassword: async () => '' }), /nonempty/);
   await assert.rejects(runAdmin('init', env, { ...prompts, askUsername: async () => 'bad username' }), /Username/);
   await runAdmin('init', env, prompts);
   await assert.rejects(runAdmin('init', env, { ...prompts, askUsername: async () => { assert.fail('Must refuse before prompting'); } }), /already initialized/);
@@ -134,14 +222,14 @@ test('CLI rename and password reset revoke live sessions and persist without ENV
   assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password })).status, 401);
 });
 
-test('random temporary initialization stores only a hash and refuses existing accounts', async t => {
+test('default initialization stores only a hash and preserves existing accounts', async t => {
   const directory = mkdtempSync(join(tmpdir(), 'pa-issuer-initial-test-'));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const env = { DATABASE_PATH: join(directory, 'test.sqlite') };
   let delivered = '';
   await runAdmin('init-default', env, { output: text => { if (text.startsWith('Initial administrator')) delivered = text; } });
   const initialPassword = delivered.split(': ').at(-1);
-  assert.match(initialPassword, /^[A-Za-z0-9_-]{32}$/);
+  assert.equal(initialPassword, 'admin123');
   const db = openDatabase(env.DATABASE_PATH);
   try {
     const admin = requireAdministrator(db);
@@ -150,7 +238,7 @@ test('random temporary initialization stores only a hash and refuses existing ac
     assert.ok(await verifyPassword(initialPassword, admin.passwordHash));
     assert.ok(!JSON.stringify(admin).includes(initialPassword));
   } finally { db.close(); }
-  await assert.rejects(runAdmin('init-default', env, { output: () => assert.fail('Must not deliver another password') }), /already initialized/);
+  await runAdmin('init-default', env, { output: text => assert.match(text, /already initialized/) });
 });
 
 test('credential revision prevents in-flight old login from restoring revoked sessions', async () => {
@@ -246,6 +334,73 @@ test('account changes require current password and CSRF, then revoke every sessi
   assert.equal((await f.request('/api/login', 'POST', { username: 'renamed', password: nextPassword })).status, 200);
 });
 
+test('batch creation and confirmed deletion are authorized, atomic and remove device records', async t => {
+  const f = await fixture(t);
+  const input = { productId: 'photoarchiver', edition: 'standard', quantity: 3, note: 'Batch customer' };
+  assert.equal((await f.request('/api/cards/batch', 'POST', input)).status, 401);
+  assert.equal((await f.request('/api/cards/batch', 'DELETE', { cardIds: [], confirmed: true })).status, 401);
+  await f.login();
+  assert.equal((await f.request('/api/cards/batch', 'POST', input, { 'X-CSRF-Token': '' })).status, 403);
+  for (const quantity of [0, 101, 1.5, '3', null]) assert.equal((await f.request('/api/cards/batch', 'POST', { ...input, quantity })).status, 400);
+  assert.equal((await f.request('/api/cards/batch', 'POST', { ...input, edition: 'invalid' })).status, 400);
+  assert.equal((await f.request('/api/cards')).body.total, 0);
+  const created = await f.request('/api/cards/batch', 'POST', input);
+  assert.equal(created.status, 201);
+  const cards = created.body.items;
+  assert.equal(cards.length, 3);
+  assert.equal(new Set(cards.map(card => card.cardCode)).size, 3);
+  assert.ok(cards.every(card => card.maxDevices === 2 && card.note === input.note));
+  const activation = { cardCode: cards[0].cardCode, productId: 'photoarchiver', machineFingerprint: machine };
+  assert.equal((await f.request('/api/v1/activate', 'POST', activation)).status, 200);
+  const deletion = { cardIds: cards.slice(0, 2).map(card => card.cardId), confirmed: true };
+  assert.equal((await f.request('/api/cards/batch', 'DELETE', deletion, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request('/api/cards/batch', 'DELETE', deletion, { Origin: 'https://attacker.example' })).status, 403);
+  for (const invalid of [{ cardIds: deletion.cardIds }, { ...deletion, confirmed: 'true' }, { ...deletion, cardIds: [] },
+    { ...deletion, cardIds: [cards[0].cardId, cards[0].cardId] }, { ...deletion, cardIds: ['invalid'] }]) {
+    assert.equal((await f.request('/api/cards/batch', 'DELETE', invalid)).status, 400);
+  }
+  assert.equal((await f.request('/api/cards/batch', 'DELETE', { ...deletion, cardIds: [cards[0].cardId, '00000000-0000-0000-0000-000000000000'] })).status, 404);
+  assert.equal((await f.request('/api/cards')).body.total, 3);
+  // A database failure after the first deletion must roll the entire batch back.
+  const db = openDatabase(f.config.database);
+  db.exec(`CREATE TRIGGER prevent_test_delete BEFORE DELETE ON cards WHEN OLD.cardId='${cards[1].cardId}' BEGIN SELECT RAISE(ABORT,'test rollback'); END;`);
+  assert.equal((await f.request('/api/cards/batch', 'DELETE', deletion)).status, 500);
+  assert.equal(db.prepare('SELECT count(*) AS count FROM cards').get().count, 3);
+  assert.equal(db.prepare('SELECT count(*) AS count FROM activations').get().count, 1);
+  db.exec('DROP TRIGGER prevent_test_delete');
+  const removed = await f.request('/api/cards/batch', 'DELETE', deletion);
+  assert.equal(removed.status, 200); assert.equal(removed.body.deleted, 2);
+  assert.equal(db.prepare('SELECT count(*) AS count FROM activations').get().count, 0);
+  db.exec(`CREATE TRIGGER prevent_test_insert BEFORE INSERT ON cards WHEN (SELECT count(*) FROM cards)>=2 BEGIN SELECT RAISE(ABORT,'test rollback'); END;`);
+  assert.equal((await f.request('/api/cards/batch', 'POST', input)).status, 500);
+  assert.equal(db.prepare('SELECT count(*) AS count FROM cards').get().count, 1);
+  db.exec('DROP TRIGGER prevent_test_insert');
+  db.close();
+  await f.restart();
+  assert.equal((await f.request('/api/cards')).body.total, 1);
+  assert.equal((await f.request(`/api/cards/${cards[2].cardId}`)).status, 200);
+  assert.equal((await f.request('/api/v1/activate', 'POST', activation)).status, 404);
+});
+
+test('dedicated password endpoint accepts short passwords and revokes sessions', async t => {
+  const f = await fixture(t);
+  await f.login();
+  const path = '/api/account/password';
+  assert.equal((await f.request(path, 'PATCH', { currentPassword: password, newPassword: '1' }, { Cookie: '' })).status, 401);
+  assert.equal((await f.request(path, 'PATCH', { currentPassword: password, newPassword: '1' }, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request(path, 'PATCH', { currentPassword: 'wrong', newPassword: '1' })).status, 403);
+  for (const input of [{ currentPassword: password }, { currentPassword: password, newPassword: '' },
+    { currentPassword: password, newPassword: 'a'.repeat(257) }, { currentPassword: password, newPassword: '1', username: 'other' }]) {
+    assert.equal((await f.request(path, 'PATCH', input)).status, 400);
+  }
+  assert.equal((await f.request(path, 'PATCH', { currentPassword: password, newPassword: '1' })).status, 200);
+  assert.equal((await f.request('/api/session')).status, 401);
+  assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password })).status, 401);
+  await f.restart();
+  assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password: '1' })).status, 200);
+  assert.ok(await verifyPassword('1', await hashPassword('1')));
+});
+
 test('temporary administrator can only update account until password is changed', async t => {
   const f = await fixture(t);
   const db = openDatabase(f.config.database);
@@ -253,6 +408,8 @@ test('temporary administrator can only update account until password is changed'
   db.close();
   await f.login();
   assert.equal((await f.request('/api/licenses')).status, 403);
+  assert.equal((await f.request('/api/cards')).status, 403);
+  assert.equal((await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard' })).status, 403);
   assert.equal((await f.request('/api/licenses', 'POST', { machineFingerprint: machine, edition: 'standard' })).status, 403);
   assert.equal((await f.request('/api/account', 'PATCH', { currentPassword: password, username: 'test-admin' })).status, 400);
   assert.equal((await f.request('/api/account', 'PATCH', { currentPassword: password, newPassword: password })).status, 400);

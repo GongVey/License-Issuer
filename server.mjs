@@ -2,7 +2,8 @@ import http from 'node:http';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { configFromEnv, openDatabase, issueLicense, verifyPassword, hashPassword, allowLogin, digest, token, publicKeyFor, HttpError, requireAdministrator, createAdministratorSession, updateAdministrator, validateUsername } from './lib.mjs';
+import { DEFAULT_PRODUCTS, productsFromEnv, createCard, createCards, deleteCards, getCard, listCards, cardSummary, setCardStatus, allowActivation, activateCard } from './cards.mjs';
+import { configFromEnv, openDatabase, issueLicense, verifyPassword, hashPassword, allowLogin, digest, token, publicKeyFor, HttpError, requireAdministrator, createAdministratorSession, updateAdministrator, validateUsername, ensureDefaultAdministrator } from './lib.mjs';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
@@ -46,7 +47,15 @@ export function createApp(config, { clock = Date.now } = {}) {
       const mutating = !['GET', 'HEAD'].includes(req.method);
       // Do not trust forwarded headers. Proxy must preserve Host; PUBLIC_ORIGIN is authoritative.
       if (req.headers.host !== new URL(config.origin).host) throw new HttpError(403, 'Host not allowed');
-      if (mutating && (req.headers.origin !== config.origin || req.headers['sec-fetch-site'] === 'cross-site')) throw new HttpError(403, 'Origin not allowed');
+      const clientActivation = url.pathname === '/api/v1/activate' && req.method === 'POST';
+      if (mutating && ((!clientActivation && req.headers.origin !== config.origin) || (clientActivation && req.headers.origin !== undefined && req.headers.origin !== config.origin) || req.headers['sec-fetch-site'] === 'cross-site')) throw new HttpError(403, 'Origin not allowed');
+      if (clientActivation) {
+        if (!allowActivation(db, req.socket.remoteAddress || 'unknown', now)) {
+          res.setHeader('Retry-After', '60');
+          throw new HttpError(429, 'Too many activation attempts; try again later');
+        }
+        json(200, activateCard(db, await body(req), config, clock())); return;
+      }
       if (req.method === 'GET' && assets.has(url.pathname)) {
         const asset = assets.get(url.pathname);
         res.writeHead(200, { 'Content-Type': asset.type }); res.end(asset.body); return;
@@ -80,22 +89,24 @@ export function createApp(config, { clock = Date.now } = {}) {
       if (mutating && req.headers['x-csrf-token'] !== session.csrf) throw new HttpError(403, 'CSRF token required');
       const admin = requireAdministrator(db);
       if (url.pathname === '/api/session' && req.method === 'GET') {
-        json(200, { username: session.username, mustChangePassword: Boolean(admin.mustChangePassword), csrf: session.csrf, expiresAt: session.expires, editions: config.editions, publicKey: publicKeyFor(config.privateKey) }); return;
+        json(200, { username: session.username, mustChangePassword: Boolean(admin.mustChangePassword), csrf: session.csrf, expiresAt: session.expires, editions: config.editions, products: config.products || DEFAULT_PRODUCTS, publicKey: publicKeyFor(config.privateKey) }); return;
       }
       if (url.pathname === '/api/logout' && req.method === 'POST') {
         db.prepare('DELETE FROM sessions WHERE id=?').run(session.id);
         res.setHeader('Set-Cookie', cookie('', 0)); json(200, { ok: true }); return;
       }
-      if (url.pathname === '/api/account' && req.method === 'PATCH') {
+      if (['/api/account', '/api/account/password'].includes(url.pathname) && req.method === 'PATCH') {
         if (!allowLogin(db, req.socket.remoteAddress || 'unknown', config, now) || pendingLogins >= 4) throw new HttpError(429, 'Too many credential attempts; try again later');
         pendingLogins++;
         try {
         const input = await body(req);
+        if (url.pathname === '/api/account/password' && (Object.keys(input).some(key => !['currentPassword', 'newPassword'].includes(key)) || typeof input.newPassword !== 'string')) throw new HttpError(400, 'Current and new password required');
         if (Object.keys(input).some(key => !['currentPassword', 'username', 'newPassword'].includes(key)) || typeof input.currentPassword !== 'string' || input.currentPassword.length > 256 ||
             (input.username === undefined && input.newPassword === undefined) ||
             (input.username !== undefined && typeof input.username !== 'string') ||
             (input.newPassword !== undefined && typeof input.newPassword !== 'string')) throw new HttpError(400, 'Invalid account settings');
-        if (input.newPassword !== undefined && (input.newPassword.length < 16 || input.newPassword.length > 256 || input.newPassword === input.currentPassword)) throw new HttpError(400, 'Use a different password of 16 to 256 characters');
+        if (input.newPassword !== undefined && (input.newPassword.length < 1 || input.newPassword.length > 256)) throw new HttpError(400, 'Password must be nonempty and at most 256 characters');
+        if (input.newPassword !== undefined && input.newPassword === input.currentPassword) throw new HttpError(400, 'New password must differ from current password');
         if (admin.mustChangePassword && input.newPassword === undefined) throw new HttpError(400, 'Replace your temporary password');
         if (input.username !== undefined) {
           try { validateUsername(input.username); } catch (error) { throw new HttpError(400, error.message); }
@@ -109,6 +120,24 @@ export function createApp(config, { clock = Date.now } = {}) {
       if (admin.mustChangePassword) {
         throw new HttpError(403, 'Change your temporary password before accessing licenses');
       }
+      if (url.pathname === '/api/dashboard' && req.method === 'GET') {
+        json(200, cardSummary(db)); return;
+      }
+      if (url.pathname === '/api/cards' && req.method === 'POST') {
+        json(201, createCard(db, await body(req), config, clock())); return;
+      }
+      if (url.pathname === '/api/cards/batch' && req.method === 'POST') {
+        json(201, createCards(db, await body(req), config, clock())); return;
+      }
+      if (url.pathname === '/api/cards/batch' && req.method === 'DELETE') {
+        json(200, deleteCards(db, await body(req))); return;
+      }
+      if (url.pathname === '/api/cards' && req.method === 'GET') {
+        json(200, listCards(db, url.searchParams)); return;
+      }
+      const cardMatch = /^\/api\/cards\/([a-f0-9-]{36})$/.exec(url.pathname);
+      if (cardMatch && req.method === 'GET') { json(200, getCard(db, cardMatch[1])); return; }
+      if (cardMatch && req.method === 'PATCH') { json(200, setCardStatus(db, cardMatch[1], await body(req))); return; }
       if (url.pathname === '/api/licenses' && req.method === 'POST') {
         const record = issueLicense(config.privateKey, await body(req), config.editions, clock());
         db.prepare('INSERT INTO licenses VALUES (?,?,?,?,?,?,?)').run(record.licenseId, record.machineFingerprint, record.edition, record.issuedAt, record.note, record.code, record.status);
@@ -150,6 +179,9 @@ export function createApp(config, { clock = Date.now } = {}) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const config = configFromEnv(process.env);
+    config.products = productsFromEnv(process.env);
+    const bootstrapDb = openDatabase(config.database);
+    try { await ensureDefaultAdministrator(bootstrapDb); } finally { bootstrapDb.close(); }
     const { server } = createApp(config);
     server.on('error', () => { console.error('Server failed to listen'); process.exitCode = 1; server.close(); });
     server.listen(config.port, config.host, () => console.log(`License issuer listening on ${config.host}:${config.port}; public origin ${config.origin}`));

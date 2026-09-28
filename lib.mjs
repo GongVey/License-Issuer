@@ -19,8 +19,8 @@ export function passwordParts(value) {
   return { salt: Buffer.from(salt, 'hex'), hash: Buffer.from(hash, 'hex') };
 }
 export async function hashPassword(password) {
-  if (typeof password !== 'string' || password.length < 16 || password.length > 256) {
-    throw new Error('Use a unique password of 16 to 256 characters');
+  if (typeof password !== 'string' || password.length < 1 || password.length > 256) {
+    throw new Error('Password must be nonempty and at most 256 characters');
   }
   const salt = randomBytes(16);
   const hash = await derive(password, salt, 64, { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
@@ -105,7 +105,17 @@ export function openDatabase(path) {
       // Legacy ENV sessions cannot safely be attributed to a database administrator.
       db.exec('DELETE FROM sessions; ALTER TABLE sessions ADD COLUMN adminId INTEGER REFERENCES administrators(id);');
     }
-    db.exec('COMMIT');
+    db.exec(`CREATE TABLE IF NOT EXISTS cards (
+      cardId TEXT PRIMARY KEY, codeHash TEXT NOT NULL UNIQUE, productId TEXT NOT NULL,
+      edition TEXT NOT NULL, maxDevices INTEGER NOT NULL CHECK(maxDevices BETWEEN 1 AND 100),
+      issuedAt INTEGER NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('active','disabled')));
+    CREATE INDEX IF NOT EXISTS cards_issued ON cards(issuedAt DESC, cardId);
+    CREATE TABLE IF NOT EXISTS activations (
+      activationId TEXT PRIMARY KEY, cardId TEXT NOT NULL REFERENCES cards(cardId),
+      machineFingerprint TEXT NOT NULL, issuedAt INTEGER NOT NULL, code TEXT NOT NULL,
+      UNIQUE(cardId, machineFingerprint));
+    CREATE TABLE IF NOT EXISTS activation_attempts (bucket TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
+    COMMIT`);
     return db;
   } catch (error) { db.close(); throw error; }
 }
@@ -128,6 +138,14 @@ export function initializeAdministrator(db, username, passwordHash, mustChangePa
     db.prepare('INSERT INTO administrators (id,username,passwordHash,mustChangePassword) VALUES (1,?,?,?)').run(username, passwordHash, mustChangePassword ? 1 : 0);
     db.exec('DELETE FROM sessions; COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
+}
+export async function ensureDefaultAdministrator(db) {
+  if (db.prepare('SELECT 1 FROM administrators LIMIT 1').get()) return false;
+  const passwordHash = await hashPassword('admin123');
+  // Recheck atomically after hashing so concurrent startups never overwrite an account.
+  return db.prepare(`INSERT INTO administrators (id,username,passwordHash,mustChangePassword)
+    SELECT 1,'admin',?,1 WHERE NOT EXISTS (SELECT 1 FROM administrators)`)
+    .run(passwordHash).changes === 1;
 }
 export function importAdministrator(db, env) {
   if (!env.ADMIN_USERNAME || !env.ADMIN_PASSWORD_HASH) throw new Error('Explicit import requires ADMIN_USERNAME and ADMIN_PASSWORD_HASH');
