@@ -165,8 +165,8 @@ test('startup rejects absent SQLite administrator and unsafe remote HTTP', () =>
   assert.throws(() => configFromEnv({ PUBLIC_ORIGIN: 'http://example.com' }), /HTTPS/);
   assert.throws(() => configFromEnv({ HOST: '0.0.0.0' }), /HTTPS/);
   assert.throws(() => configFromEnv({ ADMIN_PASSWORD_HASH: passwordHash }), /PRIVATE_KEY_PATH/);
-  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine.toUpperCase(), edition: 'standard' }, ['standard']), /Machine/);
-  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine, edition: '' }, ['standard']), /Edition/);
+  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine.toUpperCase(), edition: 'standard' }, ['standard']), /机器码/);
+  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine, edition: '' }, ['standard']), /授权版本/);
   assert.throws(() => publicKeyFor(generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey), /Ed25519/);
   assert.throws(() => assertMatchingKey(privateKey, CLIENT_PUBLIC_KEY), /does not match/);
   assert.equal(assertMatchingKey(privateKey, publicKeyFor(privateKey)), privateKey);
@@ -450,8 +450,10 @@ test('issuance, literal injection search, validation, concurrent persistence and
   assert.equal((await f.request(`/api/licenses/${id}`)).body.code, issued.body.code);
   assert.equal((await f.request(`/api/licenses/${id}`)).body.status, 'archived');
   for (const path of ['/.env', '/server.mjs', '/data/issuer.sqlite', '/%2e%2e/lib.mjs']) assert.equal((await f.request(path)).status, 404);
-  const js = (await f.request('/app.js')).body;
-  assert.ok(!js.includes('innerHTML')); assert.ok(!js.includes('privateKey'));
+  for (const path of ['/app.js', '/js/dom.js', '/js/ui.js', '/js/card-drawer.js', '/js/generate.js', '/js/lookup.js', '/js/views/cards.js', '/js/views/overview.js', '/js/views/settings.js']) {
+    const js = (await f.request(path)).body;
+    assert.ok(js.length > 100, path); assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML/.test(js), path); assert.ok(!js.includes('privateKey'), path);
+  }
 });
 
 test('login limit persists through restart and resets only after window', async t => {
@@ -483,4 +485,101 @@ test('HTTPS deployment sets Secure host-only cookies and HSTS', async t => {
   assert.match(login.headers.get('set-cookie'), /; Secure$/);
   assert.ok(!login.headers.get('set-cookie').includes('Domain='));
   assert.equal(login.headers.get('strict-transport-security'), 'max-age=31536000');
+});
+
+test('card codes are stored encrypted, revealable, exportable and found by lookup', async t => {
+  const f = await fixture(t); await f.login();
+  const created = await f.request('/api/cards/batch', 'POST', { productId: 'wallpaper', edition: 'standard', quantity: 2, customer: '张三', channel: '闲鱼', orderNo: '=cmd', note: 'n' });
+  assert.equal(created.status, 201);
+  const [card] = created.body.items;
+  assert.equal(card.customer, '张三'); assert.equal(card.state, 'unused'); assert.equal(card.hasCode, true);
+  assert.equal(created.body.batchId, card.batchId);
+  const db = openDatabase(f.config.database);
+  assert.ok(!JSON.stringify(db.prepare('SELECT * FROM cards').all()).includes(card.cardCode));
+  db.close();
+  assert.equal((await f.request(`/api/cards/${card.cardId}/reveal`, 'POST', {}, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request(`/api/cards/${card.cardId}/reveal`, 'POST', {})).body.cardCode, card.cardCode);
+  const found = await f.request('/api/lookup', 'POST', { query: ` ${card.cardCode.toLowerCase()} ` });
+  assert.equal(found.body.kind, 'cardCode'); assert.equal(found.body.cards[0].cardId, card.cardId);
+  assert.equal((await f.request('/api/lookup', 'POST', { query: '张三' })).body.cards.length, 2);
+  await f.request('/api/v1/activate', 'POST', { cardCode: card.cardCode, productId: 'wallpaper', machineFingerprint: machine });
+  const byMachine = await f.request('/api/lookup', 'POST', { query: machine.toUpperCase() });
+  assert.equal(byMachine.body.kind, 'machine'); assert.deepEqual(byMachine.body.cards.map(x => x.cardId), [card.cardId]);
+  const csv = await f.request(`/api/cards/export?batchId=${card.batchId}&codes=1`);
+  assert.match(csv.headers.get('content-type'), /text\/csv/);
+  assert.ok(csv.body.includes(card.cardCode)); assert.ok(csv.body.includes("'=cmd"));
+  assert.ok(!(await f.request(`/api/cards/export?batchId=${card.batchId}`)).body.includes(card.cardCode));
+  assert.equal((await f.request('/api/cards?state=partial')).body.total, 1);
+  assert.equal((await f.request('/api/cards?state=unused')).body.total, 1);
+  assert.equal((await f.request('/api/cards?state=bogus')).status, 400);
+  const audit = (await f.request('/api/audit-log')).body.items.map(x => x.action);
+  assert.ok(audit.includes('card.reveal') && audit.includes('cards.export') && audit.includes('cards.create'));
+});
+
+test('activation log, device release, edits, batch status and dashboard trend', async t => {
+  const f = await fixture(t); await f.login();
+  const card = (await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard', maxDevices: 1 })).body;
+  const activate = fingerprint => f.request('/api/v1/activate', 'POST', { cardCode: card.cardCode, productId: 'photoarchiver', machineFingerprint: fingerprint }, { Cookie: '', 'X-CSRF-Token': '' });
+  const other = 'sha256:' + 'b'.repeat(64);
+  assert.equal((await activate(machine)).status, 200);
+  f.advance(1000);
+  assert.equal((await activate(machine)).status, 200);
+  const limited = await activate(other);
+  assert.equal(limited.status, 409); assert.equal(limited.body.code, 'device_limit');
+  const log = (await f.request(`/api/activation-log?cardId=${card.cardId}`)).body;
+  assert.deepEqual(log.items.map(x => x.result), ['device_limit', 'renewed', 'activated']);
+  assert.equal((await f.request('/api/activation-log?result=failed')).body.total, 1);
+  let detail = (await f.request(`/api/cards/${card.cardId}`)).body;
+  assert.equal(detail.state, 'full'); assert.equal(detail.devices[0].lastSeenAt, detail.devices[0].issuedAt + 1000);
+  const release = `/api/cards/${card.cardId}/devices/${detail.devices[0].activationId}/release`;
+  assert.equal((await f.request(release, 'POST', {})).status, 400);
+  detail = (await f.request(release, 'POST', { confirmed: true })).body;
+  assert.equal(detail.devices.length, 0); assert.equal(detail.releases, 1);
+  assert.equal((await activate(other)).status, 200);
+  const edited = await f.request(`/api/cards/${card.cardId}`, 'PATCH', { customer: ' 李四 ', note: 'VIP' });
+  assert.equal(edited.body.customer, '李四'); assert.equal(edited.body.note, 'VIP');
+  assert.equal((await f.request(`/api/cards/${card.cardId}`, 'PATCH', { customer: 'x'.repeat(121) })).status, 400);
+  assert.equal((await f.request(`/api/batches/${card.batchId}`, 'PATCH', { status: 'disabled' })).body.disabled, 1);
+  assert.equal((await activate(other)).body.code, 'card_disabled');
+  assert.equal((await f.request('/api/cards/batch', 'PATCH', { cardIds: [card.cardId], status: 'active' })).body.updated, 1);
+  const batches = (await f.request('/api/batches')).body;
+  assert.equal(batches.total, 1); assert.equal(batches.items[0].activatedCards, 1);
+  const dashboard = (await f.request('/api/dashboard?tz=-480')).body;
+  assert.equal(dashboard.trend.length, 30);
+  assert.deepEqual(dashboard.trend.at(-1), { date: dashboard.trend.at(-1).date, activated: 2, renewed: 1, failed: 2 });
+  assert.equal(dashboard.products.find(x => x.productId === 'photoarchiver').full, 1);
+});
+
+test('settings validate products, templates and presets; backup downloads a SQLite copy', async t => {
+  const f = await fixture(t); await f.login();
+  const settings = (await f.request('/api/settings')).body;
+  assert.equal(settings.products[0].name, '照片归档');
+  assert.equal((await f.request('/api/settings', 'PUT', { products: [{ id: 'unknown', name: 'x', color: 'teal' }] })).status, 400);
+  assert.equal((await f.request('/api/settings', 'PUT', { presets: [{ name: 'p', productId: 'wallpaper', edition: 'standard', maxDevices: 0, quantity: 1 }] })).status, 400);
+  const saved = await f.request('/api/settings', 'PUT', { products: [{ id: 'wallpaper', name: '动态壁纸', color: 'rose' }], templates: { wallpaper: '码：{cardCode}' },
+    presets: [{ name: '壁纸单卡', productId: 'wallpaper', edition: 'standard', maxDevices: 2, quantity: 1 }] });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.products.find(x => x.id === 'wallpaper').name, '动态壁纸');
+  assert.equal(saved.body.templates.wallpaper, '码：{cardCode}');
+  assert.match(saved.body.presets[0].id, /^[a-f0-9-]{36}$/);
+  assert.equal((await f.request('/api/session')).body.settings.presets.length, 1);
+  const backup = await fetch(f.config.origin + '/api/backup', { headers: { Cookie: (await f.login()).headers.get('set-cookie').split(';')[0] } });
+  assert.equal(backup.status, 200);
+  assert.equal(Buffer.from(await backup.arrayBuffer()).subarray(0, 15).toString(), 'SQLite format 3');
+});
+
+test('migration groups pre-existing cards into batches without changing them', t => {
+  const directory = mkdtempSync(join(tmpdir(), 'pa-issuer-migrate-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, 'old.sqlite');
+  const old = new DatabaseSync(path);
+  old.exec(`CREATE TABLE cards (cardId TEXT PRIMARY KEY, codeHash TEXT NOT NULL UNIQUE, productId TEXT NOT NULL, edition TEXT NOT NULL,
+    maxDevices INTEGER NOT NULL, issuedAt INTEGER NOT NULL, note TEXT NOT NULL, status TEXT NOT NULL);
+    INSERT INTO cards VALUES ('a','h1','wallpaper','standard',2,1,'x','active'),('b','h2','wallpaper','standard',2,1,'x','active'),('c','h3','wallpaper','standard',2,2,'y','disabled');`);
+  old.close();
+  const db = openDatabase(path);
+  t.after(() => db.close());
+  assert.deepEqual(db.prepare('SELECT quantity FROM batches ORDER BY createdAt').all().map(x => x.quantity), [2, 1]);
+  assert.equal(db.prepare('SELECT count(DISTINCT batchId) AS n FROM cards').get().n, 2);
+  assert.equal(db.prepare("SELECT status FROM cards WHERE cardId='c'").get().status, 'disabled');
 });

@@ -18,11 +18,11 @@ npm run admin:init
 npm start
 ```
 
-Edit `.env` before starting the service. `LICENSE_PRIVATE_KEY_PATH` must point to the signing key, and `LICENSE_EXPECTED_PUBLIC_KEY` must match the public key embedded in the client applications that consume these licenses.
+Edit `.env` before starting the service. Supported variables: `LICENSE_PRIVATE_KEY_PATH`, `LICENSE_PRIVATE_KEY_PASSPHRASE`, `LICENSE_EXPECTED_PUBLIC_KEY`, `PUBLIC_ORIGIN`, `HOST`, `PORT`, `DATABASE_PATH`, `LICENSE_PRODUCTS` (default `photoarchiver,wallpaper`), `LICENSE_EDITIONS` (default `standard`). `LICENSE_PRIVATE_KEY_PATH` must point to the signing key, and `LICENSE_EXPECTED_PUBLIC_KEY` must match the public key embedded in the client applications that consume these licenses.
 
 默认管理员：用户名 `admin`，初始密码 `admin123`。`npm run admin:init` 非交互创建默认账号；直接 `npm start` 也会在管理员表为空时自动创建。已有账号不会被覆盖，修改后的密码不会因重启而重置。需要自定义初始账号时，在空数据库上运行 `npm run admin:init-custom`。
 
-首次使用默认账号登录后，在 Account settings 中修改密码，再重新登录即可使用授权管理功能。暂不校验密码强度，支持简单短密码；仅要求非空、最多 256 个字符，新密码与当前密码不同。
+首次使用默认账号登录会直接进入「设置新密码」页面，改完重新登录即可使用。暂不校验密码强度，支持简单短密码；仅要求非空、最多 256 个字符，新密码与当前密码不同。
 
 修改密码接口：`PATCH /api/account/password`，请求体如下。需登录会话、同源 `Origin`、`X-CSRF-Token`（登录或会话接口返回），并验证当前密码。成功返回 `{"ok":true,"reauthenticate":true}`，使所有管理员会话失效；之后用新密码登录。
 
@@ -47,20 +47,34 @@ npm run admin:rename
 npm run check-key
 ```
 
+`npm test` runs an independent Python Ed25519 verifier (`pip install -r test/requirements.txt`). It calls `python` by default; on systems that only ship `python3`, run `PYTHON=python3 npm test`.
+
 For HTTPS deployment, put the service behind a reverse proxy and set `PUBLIC_ORIGIN` to the exact HTTPS origin. `Caddyfile.example` contains a sample proxy configuration.
 
-## 卡密管理
+## 管理后台
 
-后台仅保留卡密管理，可选择产品、版本、设备上限、生成数量和批次备注；每批可生成 1–100 张，生成后可复制全部卡密或下载 TXT。默认设备上限为 2，可设为 1–100。产品列表由 `LICENSE_PRODUCTS` 配置，默认 `photoarchiver,wallpaper`；新增产品使用稳定的小写标识，客户端必须校验自己的产品标识。
+浏览器打开 `PUBLIC_ORIGIN` 登录。界面为原生 ES 模块（`public/app.js` + `public/js/`），无构建步骤、无第三方依赖，遵守严格 CSP（不使用 `innerHTML`、内联脚本或内联样式），支持浅色 / 深色 / 跟随系统和手机宽度。
 
-- 卡密使用 160 位随机值，格式为 `LIC-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`。创建时仅显示一次，请复制保存后交付；数据库只保存卡密的 SHA-256 摘要，后台无法找回明文。
-- 每张卡只授权一个产品；同一机器重复激活返回同一份许可证，不消耗新名额；不同机器超过额度返回 409。
-- 详情可查看已激活的机器和时间。停用卡密后拒绝所有激活请求（包括已绑定机器的重新请求），恢复后继续使用原绑定记录。
-- 当前许可证永久有效，不要求定期联网。停用卡密不能撤回已经签发的离线许可证。因此暂不提供解绑释放额度，避免旧电脑仍可离线使用、新电脑又占用释放额度。
-- 列表支持逐项勾选及全选本页，搜索、翻页或刷新会清空选择。点击“删除所选”后，确认框显示卡密数量和设备记录数量，需再次点击“确认删除”才执行。删除不可恢复，同时清理关联激活记录；已签发的离线许可证不受影响。批量操作以事务执行，失败时不会部分删除或部分生成。
-- 后台已移除旧 PhotoArchiver `PA1` 签发和管理入口，旧数据库记录与兼容接口保留。
+| 页面 | 用途 |
+| --- | --- |
+| 概览 | 各产品可售库存（未激活卡）、状态分布、近 30 天激活趋势、最新激活请求 |
+| 卡密 | 搜索（客户、备注、订单号、渠道、卡 ID）、按产品 / 状态（未使用、部分激活、已满、已停用）/ 批次筛选；跨页勾选后批量停用、恢复、删除；导出 CSV |
+| 批次 | 每次生成为一个批次；整批停用 / 恢复，整批导出含卡密明文的 CSV |
+| 日志 | 激活记录（客户端每次请求的结果，保留 180 天）与后台操作日志 |
+| 设置 | 产品显示名称与颜色、各产品发货模板、生成预设、主题、账号、数据库备份、激活接口与签名公钥 |
+| 旧版许可证 | PhotoArchiver `PA1` 许可证只读查询（侧栏底部入口） |
 
-首次启动自动新增卡密、激活和限流数据表，保留旧许可证。升级前备份数据库；密钥应长期保留，换密钥需另行设计客户端公钥迁移。
+**快速查找**：`Ctrl/⌘ K` 或顶栏搜索框。粘贴卡密直接定位到卡（按摘要匹配）；粘贴 `sha256:` 机器码查看该电脑绑定的卡和旧版许可证；也可搜客户名、订单号。在页面空白处直接粘贴卡密或机器码也会打开查找。其他快捷键：`N` 生成卡密，`/` 聚焦卡密搜索，`Esc` 关闭弹窗。
+
+**卡密详情**（点击任意一行打开右侧抽屉）：查看 / 复制卡密、按模板复制发货文案；编辑客户、渠道、订单号、备注；查看设备（首次激活、最近请求时间）与该卡激活记录；停用 / 恢复 / 删除。
+
+- 卡密使用 160 位随机值，格式为 `LIC-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`。数据库保存 SHA-256 摘要用于激活匹配，另保存一份 AES-256-GCM 密文（密钥由签名私钥经 HKDF 派生，绑定卡 ID）用于后台回看；每次查看或含卡密导出都记入操作日志。本功能上线前创建的卡没有密文，无法回看。更换签名密钥后旧密文无法解密。
+- 每张卡只授权一个产品；同一机器重复激活返回同一份许可证，不消耗新名额；不同机器超过额度返回 409。默认设备上限 2，可设为 1–100；每批生成 1–100 张。
+- 停用卡密后拒绝所有激活请求（包括已绑定机器的重新请求），恢复后继续使用原绑定记录。删除不可恢复，同时清理设备记录（激活日志保留）。批量操作以事务执行，不会部分成功。
+- **释放设备名额**：客户换电脑时可在详情中释放某台设备，腾出名额供新电脑激活。离线许可证无法撤回，被释放的旧电脑仍可继续使用，因此需确认、记入操作日志，并在详情显示「已释放 N 次」。
+- 当前许可证永久有效，不要求定期联网；停用或删除卡密不能撤回已签发的离线许可证。
+
+升级时数据库只做增量迁移（新增列和表，旧卡按创建时间与参数自动归入批次），不会改写已有卡密、激活记录或签名。升级前仍建议在设置页下载备份。
 
 ## 客户端在线激活
 
@@ -94,7 +108,7 @@ Content-Type: application/json
 }
 ```
 
-错误响应统一为 `{"error":"说明"}`：400 参数无效，403 卡密停用或来源不允许，404 卡密不存在或不属于该产品，409 设备额度已满，429 请求过多（遵循 `Retry-After`），500 服务内部错误。客户端应在收到成功响应且本地验签通过后原子保存 `license`；网络失败时可以重试，不能删除已有有效许可证。
+错误响应统一为 `{"error":"说明","code":"机器可读代码"}`，客户端应按 HTTP 状态和 `code` 判断，`error` 文本仅供展示。激活接口的 `code`：`invalid_request`、`unknown_product`、`card_not_found`、`card_disabled`、`device_limit`、`rate_limited`。状态码：400 参数无效，403 卡密停用或来源不允许，404 卡密不存在或不属于该产品，409 设备额度已满，429 请求过多（遵循 `Retry-After`），500 服务内部错误。客户端应在收到成功响应且本地验签通过后原子保存 `license`；网络失败时可以重试，不能删除已有有效许可证。
 
 激活限流独立于管理员登录限流：每个实际连接地址每分钟最多 60 次，全局每分钟最多 1000 次，计数持久化。服务不信任客户端提交的转发 IP 头；通过反向代理的请求可能共享代理地址额度，正式部署时可在代理层补充真实客户端限流。
 
@@ -120,10 +134,22 @@ PhotoArchiver 如需兼容已发出的 `PA1`，应独立保留旧协议验证分
 
 | 接口 | 用途 |
 | --- | --- |
-| `POST /api/cards` | 创建卡密：`productId`、`edition`，可选 `maxDevices`（默认 2）、`note`；返回 201，仅此响应包含 `cardCode` |
-| `POST /api/cards/batch` | 批量生成：上述创建字段加 `quantity`（1–100）；返回 201，`{items,total}`，各项包含仅显示一次的 `cardCode` |
-| `DELETE /api/cards/batch` | 批量删除：`{"cardIds":["UUID"],"confirmed":true}`，1–100 个不重复 ID；返回 `{deleted}`；未确认或参数非法返回 400，任一 ID 不存在返回 404，整批不执行 |
-| `GET /api/cards?q=...&productId=...&offset=0` | 查询卡密，每页 30 条；包含 `usedDevices`，不含卡密明文或摘要 |
-| `GET /api/cards/:cardId` | 详情，包含已绑定设备 `devices` |
-| `PATCH /api/cards/:cardId` | `{"status":"disabled"}` 停用或 `{"status":"active"}` 恢复 |
+| `GET /api/dashboard?tz=-480` | 概览：`totals`、按产品统计 `products`（unused/partial/full/disabled）、30 天 `trend`（`tz` 为 `Date#getTimezoneOffset()`） |
+| `POST /api/lookup` | `{"query":"..."}`：按卡密、机器码、卡 / 激活 ID 或文本查找，返回 `{kind,cards,legacy}` |
+| `POST /api/cards` | 创建单张：`productId`、`edition`，可选 `maxDevices`（默认 2）、`note`、`customer`、`channel`、`orderNo`；返回 201，含 `cardCode` |
+| `POST /api/cards/batch` | 批量生成：上述字段加 `quantity`（1–100）；返回 201，`{items,total,batchId}` |
+| `PATCH /api/cards/batch` | 批量停用 / 恢复：`{"cardIds":[...],"status":"disabled"}` |
+| `DELETE /api/cards/batch` | 批量删除：`{"cardIds":["UUID"],"confirmed":true}`，1–100 个不重复 ID；任一不存在返回 404，整批不执行 |
+| `GET /api/cards?q=&productId=&state=&batchId=&offset=&limit=` | 查询卡密（`state`：`unused`/`partial`/`full`/`disabled`/`active`，兼容旧参数 `status`；`limit` 1–100，默认 30） |
+| `GET /api/cards/export?...&codes=1` | 按同样筛选导出 CSV；`codes=1` 包含卡密明文并记入日志 |
+| `GET /api/cards/:cardId` | 详情，含 `devices`（`activationId`、`machineFingerprint`、`issuedAt`、`lastSeenAt`） |
+| `PATCH /api/cards/:cardId` | 修改 `status`、`note`、`customer`、`channel`、`orderNo` 中任意字段 |
+| `POST /api/cards/:cardId/reveal` | 解密返回 `{cardCode}`；旧卡返回 404 `code_unavailable` |
+| `POST /api/cards/:cardId/devices/:activationId/release` | `{"confirmed":true}` 释放设备名额 |
+| `GET /api/batches`、`GET /api/batches/:batchId` | 批次列表 / 详情（含 `cards`、`activatedCards`、`disabled`） |
+| `PATCH /api/batches/:batchId` | `{"status":"disabled"}` 整批停用或恢复 |
+| `GET /api/activation-log?cardId=&machine=&productId=&result=ok\|failed&offset=` | 激活记录 |
+| `GET /api/audit-log?offset=` | 后台操作日志 |
+| `GET /api/settings`、`PUT /api/settings` | 产品显示名 / 颜色、发货模板（变量 `{cardCode}` `{product}` `{edition}` `{maxDevices}` `{customer}`）、生成预设 |
+| `GET /api/backup` | 下载数据库一致性快照（`VACUUM INTO`） |
 | `/api/licenses`、`/api/licenses/:licenseId` | 保留旧 PhotoArchiver 单机 PA1 签发、查询和归档行为 |

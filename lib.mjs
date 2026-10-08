@@ -9,7 +9,7 @@ const derive = promisify(scrypt);
 export const digest = value => createHash('sha256').update(value).digest('hex');
 export const token = () => randomBytes(32).toString('base64url');
 export class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, code) { super(message); this.status = status; this.code = code; }
 }
 export function passwordParts(value) {
   if (typeof value !== 'string' || !/^scrypt\$[a-f0-9]{32}\$[a-f0-9]{128}$/.test(value)) {
@@ -69,12 +69,12 @@ export function configFromEnv(env) {
 }
 export function issueLicense(key, input, editions, now = Date.now()) {
   if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(x => !['machineFingerprint', 'note', 'edition'].includes(x))) {
-    throw new HttpError(400, 'Invalid issuance fields');
+    throw new HttpError(400, '包含不支持的字段', 'invalid_fields');
   }
   const { machineFingerprint, edition, note = '' } = input;
-  if (typeof machineFingerprint !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(machineFingerprint)) throw new HttpError(400, 'Machine code must be sha256: followed by 64 lowercase hex characters');
-  if (!editions.includes(edition)) throw new HttpError(400, 'Edition is not allowed');
-  if (typeof note !== 'string' || note.length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(note)) throw new HttpError(400, 'Note must be at most 2000 characters without control characters');
+  if (typeof machineFingerprint !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(machineFingerprint)) throw new HttpError(400, '机器码必须是 sha256: 加 64 位小写十六进制', 'invalid_fingerprint');
+  if (!editions.includes(edition)) throw new HttpError(400, '不支持的授权版本', 'invalid_edition');
+  if (typeof note !== 'string' || note.length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(note)) throw new HttpError(400, '备注最多 2000 字且不能包含控制字符', 'invalid_text');
   const payload = { licenseId: randomUUID(), machineFingerprint, edition, issuedAt: now };
   const bytes = Buffer.from(JSON.stringify(payload), 'utf8');
   const code = `PA1.${bytes.toString('base64url')}.${sign(null, bytes, key).toString('base64url')}`;
@@ -114,10 +114,51 @@ export function openDatabase(path) {
       activationId TEXT PRIMARY KEY, cardId TEXT NOT NULL REFERENCES cards(cardId),
       machineFingerprint TEXT NOT NULL, issuedAt INTEGER NOT NULL, code TEXT NOT NULL,
       UNIQUE(cardId, machineFingerprint));
-    CREATE TABLE IF NOT EXISTS activation_attempts (bucket TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);
-    COMMIT`);
+    CREATE TABLE IF NOT EXISTS activation_attempts (bucket TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);`);
+    migrateCards(db);
+    db.exec('COMMIT');
     return db;
   } catch (error) { db.close(); throw error; }
+}
+const hasColumn = (db, table, column) => db.prepare(`PRAGMA table_info(${table})`).all().some(x => x.name === column);
+// Additive migrations only: existing cards, activations and signatures are never rewritten.
+function migrateCards(db) {
+  for (const [column, ddl] of [['customer', "customer TEXT NOT NULL DEFAULT ''"], ['channel', "channel TEXT NOT NULL DEFAULT ''"],
+    ['orderNo', "orderNo TEXT NOT NULL DEFAULT ''"], ['codeCipher', 'codeCipher TEXT'], ['releases', 'releases INTEGER NOT NULL DEFAULT 0']]) {
+    if (!hasColumn(db, 'cards', column)) db.exec(`ALTER TABLE cards ADD COLUMN ${ddl}`);
+  }
+  if (!hasColumn(db, 'activations', 'lastSeenAt')) db.exec('ALTER TABLE activations ADD COLUMN lastSeenAt INTEGER');
+  const backfill = !hasColumn(db, 'cards', 'batchId');
+  if (backfill) db.exec('ALTER TABLE cards ADD COLUMN batchId TEXT');
+  db.exec(`CREATE TABLE IF NOT EXISTS batches (
+      batchId TEXT PRIMARY KEY, productId TEXT NOT NULL, edition TEXT NOT NULL, maxDevices INTEGER NOT NULL,
+      quantity INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', customer TEXT NOT NULL DEFAULT '',
+      channel TEXT NOT NULL DEFAULT '', createdAt INTEGER NOT NULL);
+    CREATE INDEX IF NOT EXISTS batches_created ON batches(createdAt DESC, batchId);
+    CREATE INDEX IF NOT EXISTS cards_batch ON cards(batchId);
+    CREATE INDEX IF NOT EXISTS activations_machine ON activations(machineFingerprint);
+    CREATE TABLE IF NOT EXISTS activation_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, productId TEXT NOT NULL,
+      cardId TEXT, machineFingerprint TEXT, result TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS activation_log_at ON activation_log(at DESC, id);
+    CREATE INDEX IF NOT EXISTS activation_log_card ON activation_log(cardId, at DESC);
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, action TEXT NOT NULL,
+      target TEXT NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '');
+    CREATE INDEX IF NOT EXISTS audit_log_at ON audit_log(at DESC, id);
+    CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);`);
+  if (backfill) {
+    // Cards created together by the previous batch endpoint share issuedAt, product, edition, limit and note.
+    const groups = db.prepare(`SELECT issuedAt, productId, edition, maxDevices, note, count(*) AS quantity
+      FROM cards WHERE batchId IS NULL GROUP BY issuedAt, productId, edition, maxDevices, note`).all();
+    const insert = db.prepare('INSERT INTO batches (batchId,productId,edition,maxDevices,quantity,note,createdAt) VALUES (?,?,?,?,?,?,?)');
+    const assign = db.prepare('UPDATE cards SET batchId=? WHERE batchId IS NULL AND issuedAt=? AND productId=? AND edition=? AND maxDevices=? AND note=?');
+    for (const g of groups) {
+      const batchId = randomUUID();
+      insert.run(batchId, g.productId, g.edition, g.maxDevices, g.quantity, g.note, g.issuedAt);
+      assign.run(batchId, g.issuedAt, g.productId, g.edition, g.maxDevices, g.note);
+    }
+  }
 }
 export function validateUsername(username) {
   if (typeof username !== 'string' || !/^[A-Za-z0-9_.@-]{1,80}$/.test(username)) {
@@ -159,7 +200,7 @@ export function updateAdministrator(db, { username, passwordHash, mustChangePass
   try {
     const admin = requireAdministrator(db);
     if (expectedRevision !== undefined && (admin.revision !== expectedRevision || !db.prepare('SELECT 1 FROM sessions WHERE id=? AND adminId=? AND expires>?').get(sessionId, admin.id, now))) {
-      throw new HttpError(401, 'Credentials or session changed; sign in again');
+      throw new HttpError(401, '账号或会话已变更，请重新登录', 'session_changed');
     }
     db.prepare('UPDATE administrators SET username=?, passwordHash=?, mustChangePassword=?, revision=revision+1 WHERE id=?')
       .run(username ?? admin.username, passwordHash ?? admin.passwordHash, mustChangePassword === undefined ? admin.mustChangePassword : Number(mustChangePassword), admin.id);

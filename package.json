@@ -6,7 +6,7 @@
   "engines": { "node": ">=24.15.0 <25" },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
-    "build": "node --check server.mjs && node --check lib.mjs && node --check cards.mjs && node --check admin.mjs && node --check public/app.js",
+    "build": "for f in server.mjs lib.mjs cards.mjs logs.mjs settings.mjs admin.mjs public/app.js public/theme.js public/js/*.js public/js/views/*.js; do node --check $f || exit 1; done",
     "test": "node --test test/*.test.mjs",
     "admin": "node --env-file-if-exists=.env admin.mjs",
     "admin:init": "node --env-file-if-exists=.env admin.mjs init-default",
