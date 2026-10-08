@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, setCsrf, setUnauthorizedHandler } from './lib/api';
+import { applyBranding } from './lib/brand';
 import type { Product, Session, Settings } from './lib/types';
 
 interface SessionValue {
@@ -46,9 +47,10 @@ export function useSessionLoader() {
 
 export function SessionProvider({ session, signOut, children }: { session: Session; signOut: (message?: string) => void; children: ReactNode }) {
   const [settings, setSettings] = useState(session.settings);
+  useEffect(() => { applyBranding(settings.branding); }, [settings.branding]);
   const value = useMemo<SessionValue>(() => ({
     session, settings, setSettings, signOut,
-    product: id => settings.products.find(p => p.id === id) || { id, name: id || '—', color: 'slate' },
+    product: id => settings.products.find(p => p.id === id) || { id, name: id || '—', color: '#64748b' },
   }), [session, settings, signOut]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

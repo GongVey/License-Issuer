@@ -11,7 +11,8 @@ import { OverviewPage } from './pages/Overview';
 import { AccountForm, SettingsPage } from './pages/Settings';
 import { SessionProvider, useSession, useSessionLoader } from './session';
 import { Button } from './ui/controls';
-import { LogoMark } from './layout/Logo';
+import { BrandMark } from './layout/Logo';
+import { cachedBrandName } from './lib/brand';
 
 const PAGES: Record<string, { title: string; Page: () => React.JSX.Element }> = {
   '/overview': { title: '概览', Page: OverviewPage },
@@ -23,7 +24,7 @@ const PAGES: Record<string, { title: string; Page: () => React.JSX.Element }> = 
 
 export function App() {
   const { status, load, signOut } = useSessionLoader();
-  if (status.kind === 'loading') return <div className="grid min-h-dvh place-items-center"><LogoMark className="animate-pulse" /></div>;
+  if (status.kind === 'loading') return <div className="grid min-h-dvh place-items-center"><BrandMark name={cachedBrandName()} className="animate-pulse" /></div>;
   if (status.kind === 'signed-out') return <LoginPage message={status.message} onSignedIn={load} />;
   return (
     <SessionProvider key={status.session.csrf} session={status.session} signOut={signOut}>
@@ -36,18 +37,20 @@ function Routes() {
   const { path } = useRoute();
   const page = PAGES[path];
   useEffect(() => { if (!page) navigate('/overview', {}, { replace: true }); }, [page]);
-  useEffect(() => { document.title = `${page?.title ?? '概览'} · License Issuer`; window.scrollTo(0, 0); }, [page]);
+  const { settings } = useSession();
+  useEffect(() => { document.title = `${page?.title ?? '概览'} · ${settings.branding.name}`; window.scrollTo(0, 0); }, [page, settings.branding.name]);
   if (!page) return null;
   return <AppShell><page.Page key={path} /></AppShell>;
 }
 
 function ForcePassword() {
-  const { session, signOut } = useSession();
-  useEffect(() => { document.title = '设置新密码 · License Issuer'; }, []);
+  const { session, settings, signOut } = useSession();
+  useEffect(() => { document.title = `设置新密码 · ${settings.branding.name}`; }, [settings.branding.name]);
+  const branding = { ...settings.branding, products: settings.branding.showProducts ? settings.products : [] };
   return (
-    <AuthLayout subtitle={`当前账号：${session.username}`}>
-      <h1 className="text-xl font-semibold">请先设置新密码</h1>
-      <p className="mt-1 mb-6 text-[13px] text-muted">你正在使用初始密码。设置新密码后需要重新登录。</p>
+    <AuthLayout branding={branding}>
+      <h1 className="text-2xl font-semibold tracking-tight">设置新密码</h1>
+      <p className="mt-1.5 mb-8 text-sm text-muted">账号 {session.username} 正在使用初始密码，设置新密码后需要重新登录。</p>
       <AccountForm forced />
       <Button variant="ghost" className="mt-3 w-full" onClick={async () => { try { await api('/api/logout', 'POST', {}); } catch { /* ignore */ } signOut(); }}>退出登录</Button>
     </AuthLayout>

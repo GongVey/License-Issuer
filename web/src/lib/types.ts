@@ -1,8 +1,9 @@
 export type CardState = 'unused' | 'partial' | 'full' | 'disabled';
-export type ProductColor = 'teal' | 'indigo' | 'amber' | 'rose' | 'violet' | 'sky' | 'koi' | 'slate';
-export interface Product { id: string; name: string; color: ProductColor }
+export interface Product { id: string; name: string; color: string }
+export interface Branding { name: string; tagline: string; accent: string; showProducts: boolean }
+export interface PublicBranding extends Branding { products: Array<{ id: string; name: string; color: string }> }
 export interface Preset { id: string; name: string; productId: string; edition: string; maxDevices: number; quantity: number }
-export interface Settings { products: Product[]; templates: Record<string, string>; presets: Preset[]; editions: string[] }
+export interface Settings { branding: Branding; products: Product[]; templates: Record<string, string>; presets: Preset[]; editions: string[] }
 export interface Session {
   username: string; mustChangePassword: boolean; csrf: string; expiresAt: number;
   editions: string[]; products: string[]; publicKey: string; origin: string; settings: Settings;

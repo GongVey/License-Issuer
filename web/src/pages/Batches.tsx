@@ -47,7 +47,7 @@ export function BatchesPage() {
         ) : desktop ? (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
-              <thead><tr className="border-b border-line text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
+              <thead><tr className="border-b border-line bg-surface-2/50 text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
                 <th className="!pl-4">创建时间</th><th>产品</th><th>客户 / 备注</th><th className="text-right">数量</th><th>已激活</th><th className="text-right">停用</th><th />
               </tr></thead>
               <tbody>{items.map(b => <BatchRow key={b.batchId} batch={b} />)}</tbody>

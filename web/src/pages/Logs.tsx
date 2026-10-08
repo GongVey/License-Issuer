@@ -50,7 +50,7 @@ function ActivationLog({ params }: { params: URLSearchParams }) {
       {list.isLoading ? <ListSkeleton /> : items.length === 0 ? <Empty icon={<Activity />} title="暂无记录" description="客户端发起激活后会记录在这里。" />
         : desktop ? (
           <table className="w-full border-collapse text-left">
-            <thead><tr className="border-b border-line text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium">
+            <thead><tr className="border-b border-line bg-surface-2/50 text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium">
               <th className="!pl-4">时间</th><th>结果</th><th>产品</th><th>卡密</th><th>机器码</th>
             </tr></thead>
             <tbody>{items.map(item => (

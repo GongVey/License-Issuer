@@ -1,22 +1,12 @@
 import { cn } from '../lib/cn';
 
-export function LogoMark({ className }: { className?: string }) {
+// The brand mark is the brand's first character on the accent color, so renaming the brand needs no artwork.
+export function BrandMark({ name, className, inverted }: { name: string; className?: string; inverted?: boolean }) {
   return (
-    <span className={cn('grid size-9 shrink-0 place-items-center rounded-[11px] bg-primary text-on-primary shadow-sm', className)} aria-hidden>
-      <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="8.5" cy="12" r="4" /><path d="M12.5 12H21M18 12v3M21 12v2.5" />
-      </svg>
+    <span aria-hidden className={cn('grid size-8 shrink-0 place-items-center rounded-[9px] text-[15px] font-bold',
+      inverted ? 'bg-white text-[color-mix(in_oklab,var(--accent)_80%,black)]' : 'bg-primary text-on-primary',
+      'shadow-[inset_0_1px_0_rgb(255_255_255/0.25),inset_0_-1px_0_rgb(0_0_0/0.12),0_1px_2px_rgb(0_0_0/0.15)]', className)}>
+      {Array.from(name.trim())[0]?.toUpperCase() || '·'}
     </span>
-  );
-}
-export function Logo({ className, compact }: { className?: string; compact?: boolean }) {
-  return (
-    <div className={cn('flex items-center gap-2.5', className)}>
-      <LogoMark className={compact ? 'size-8' : undefined} />
-      <div className="leading-tight">
-        <div className="font-semibold">License Issuer</div>
-        {!compact && <div className="text-xs text-muted">统一授权服务</div>}
-      </div>
-    </div>
   );
 }

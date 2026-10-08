@@ -550,13 +550,23 @@ test('settings validate products, templates and presets; backup downloads a SQLi
   const f = await fixture(t); await f.login();
   const settings = (await f.request('/api/settings')).body;
   assert.equal(settings.products[0].name, '照片归档');
-  assert.equal(settings.products[1].name, '一池锦鲤'); assert.equal(settings.products[1].color, 'koi');
-  assert.equal((await f.request('/api/settings', 'PUT', { products: [{ id: 'unknown', name: 'x', color: 'teal' }] })).status, 400);
+  assert.equal(settings.products[1].name, '一池锦鲤'); assert.match(settings.products[1].color, /^#[0-9a-f]{6}$/);
+  assert.equal((await f.request('/api/settings', 'PUT', { products: [{ id: 'wallpaper', name: 'x', color: 'koi' }] })).status, 400);
+  assert.equal((await f.request('/api/settings', 'PUT', { branding: { name: 'x', tagline: '', accent: 'red', showProducts: true } })).status, 400);
+  const branded = await f.request('/api/settings', 'PUT', { branding: { name: ' 我的授权中心 ', tagline: '副标题', accent: '#AA3366', showProducts: false } });
+  assert.deepEqual(branded.body.branding, { name: '我的授权中心', tagline: '副标题', accent: '#aa3366', showProducts: false });
+  const anonymous = await f.request('/api/branding', 'GET', undefined, { Cookie: '' });
+  assert.equal(anonymous.status, 200); assert.equal(anonymous.body.name, '我的授权中心'); assert.deepEqual(anonymous.body.products, []);
+  await f.request('/api/settings', 'PUT', { branding: { ...branded.body.branding, showProducts: true } });
+  assert.deepEqual((await f.request('/api/branding', 'GET', undefined, { Cookie: '' })).body.products.map(p => p.name), ['照片归档', '一池锦鲤']);
+  assert.match((await f.request('/')).headers.get('content-security-policy'), /font-src 'self'/);
+  assert.equal((await f.request('/api/settings', 'PUT', { products: [{ id: 'unknown', name: 'x', color: '#000000' }] })).status, 400);
   assert.equal((await f.request('/api/settings', 'PUT', { presets: [{ name: 'p', productId: 'wallpaper', edition: 'standard', maxDevices: 0, quantity: 1 }] })).status, 400);
-  const saved = await f.request('/api/settings', 'PUT', { products: [{ id: 'wallpaper', name: '动态壁纸', color: 'rose' }], templates: { wallpaper: '码：{cardCode}' },
+  const saved = await f.request('/api/settings', 'PUT', { products: [{ id: 'wallpaper', name: '动态壁纸', color: '#D6457A' }], templates: { wallpaper: '码：{cardCode}' },
     presets: [{ name: '壁纸单卡', productId: 'wallpaper', edition: 'standard', maxDevices: 2, quantity: 1 }] });
   assert.equal(saved.status, 200);
   assert.equal(saved.body.products.find(x => x.id === 'wallpaper').name, '动态壁纸');
+  assert.equal(saved.body.products.find(x => x.id === 'wallpaper').color, '#d6457a');
   assert.equal(saved.body.templates.wallpaper, '码：{cardCode}');
   assert.match(saved.body.presets[0].id, /^[a-f0-9-]{36}$/);
   assert.equal((await f.request('/api/session')).body.settings.presets.length, 1);

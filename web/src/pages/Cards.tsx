@@ -143,7 +143,7 @@ function CardTable({ items, selected, pageSelected, onToggle, onToggleAll, onOpe
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
-        <thead><tr className="border-b border-line text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
+        <thead><tr className="border-b border-line bg-surface-2/50 text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
           <th className="w-10 !pl-4"><Checkbox aria-label="选择本页全部" checked={all.checked} ref={el => { if (el) el.indeterminate = all.indeterminate; }} onChange={e => onToggleAll(e.target.checked)} /></th>
           <th>产品</th><th>客户 / 备注</th><th>设备</th><th>状态</th><th className="hidden lg:table-cell">最近活跃</th><th>创建</th>
         </tr></thead>

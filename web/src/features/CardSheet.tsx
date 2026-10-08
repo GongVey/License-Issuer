@@ -55,7 +55,7 @@ export function CardSheet({ cardId, onClose }: { cardId: string; onClose: () => 
       <div className="flex items-center gap-2">
         <ProductChip product={product(data.productId)} />
         <StateBadge state={data.state} />
-        <IconButton label="关闭" size="sm" className="-mr-2 ml-auto" onClick={close}><X className="size-4" /></IconButton>
+        <IconButton label="关闭" size="sm" data-dialog-close="" className="-mr-2 ml-auto" onClick={close}><X className="size-4" /></IconButton>
       </div>
       <h2 className="text-lg font-semibold leading-snug">{cardTitle(data)}</h2>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted">

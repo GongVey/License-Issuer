@@ -42,7 +42,7 @@ export function FeedbackProvider({ children }: { children: ReactNode }) {
         {/* Sits above the phone tab bar; bottom-right on desktop. */}
         <div ref={stack} popover="manual" aria-live="polite" className="pointer-events-none fixed inset-x-0 top-auto bottom-[calc(76px+env(safe-area-inset-bottom))] z-[100] m-0 flex w-auto flex-col items-center gap-2 overflow-visible border-0 bg-transparent p-0 px-4 md:left-auto md:right-5 md:bottom-5 md:items-end">
           {toasts.map(t => (
-            <div key={t.id} className={cn('anim-toast pointer-events-auto flex max-w-[min(440px,100%)] items-center gap-2.5 rounded-xl px-4 py-3 text-[13px] shadow-lg',
+            <div key={t.id} className={cn('anim-toast pointer-events-auto flex max-w-[min(440px,100%)] items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-[13px] font-medium shadow-lg',
               t.kind === 'error' ? 'bg-danger text-white' : 'bg-fg text-bg')}>
               {t.kind === 'error' ? <XCircle className="size-4 shrink-0" /> : <CheckCircle2 className="size-4 shrink-0" />}<span>{t.message}</span>
             </div>

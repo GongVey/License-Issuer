@@ -6,7 +6,7 @@ import { resolve, join, extname, sep } from 'node:path';
 import { productsFromEnv, createCard, createCards, deleteCards, getCard, listCards, exportCards, cardSummary, updateCard, setCardsStatus,
   revealCode, releaseDevice, lookup, listBatches, getBatch, setBatchStatus, allowActivation, activateCard, UUID } from './cards.mjs';
 import { listActivationLog, listAuditLog, audit } from './logs.mjs';
-import { getSettings, saveSettings } from './settings.mjs';
+import { getSettings, saveSettings, getPublicBranding } from './settings.mjs';
 import { configFromEnv, openDatabase, verifyPassword, hashPassword, allowLogin, digest, token, publicKeyFor, HttpError, requireAdministrator, createAdministratorSession, updateAdministrator, validateUsername, ensureDefaultAdministrator } from './lib.mjs';
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml',
@@ -110,7 +110,7 @@ export function createApp(config, { clock = Date.now } = {}) {
   }
 
   const server = http.createServer({ maxHeaderSize: 16384, requestTimeout: 15000, headersTimeout: 10000 }, async (req, res) => {
-    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; font-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -142,6 +142,7 @@ export function createApp(config, { clock = Date.now } = {}) {
       if (req.method === 'GET' && url.pathname === '/' && !assets.size) {
         res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(MISSING_BUILD); return;
       }
+      if (url.pathname === '/api/branding' && req.method === 'GET') { json(200, getPublicBranding(db, config)); return; }
       if (url.pathname === '/api/login' && req.method === 'POST') {
         if (!allowLogin(db, req.socket.remoteAddress || 'unknown', config, now)) {
           res.setHeader('Retry-After', String(Math.ceil(config.loginWindowMs / 1000)));
