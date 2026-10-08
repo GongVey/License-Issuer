@@ -1,5 +1,7 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/fraunces/opsz.css";
+@import "@fontsource-variable/fraunces/opsz-italic.css";
 
 /*
  * Design tokens. Components only reference these semantic names.
@@ -9,54 +11,61 @@
  */
 :root {
   color-scheme: light;
-  --accent: #5b5bd6;
-  --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f3f3f5; --surface-3: #e8e8ec; --hover: #f5f5f7;
-  --line: #e6e6ea; --line-strong: #d4d4da;
-  --fg: #111114; --fg-2: #46464f; --muted: #7a7a85;
+  --accent: #b8432f;
+  /* 纸 · paper canvas and ink text */
+  --bg: #f4f2ec; --surface: #fbfaf6; --surface-2: #efece4; --surface-3: #e4e0d5; --hover: #eeebe3;
+  --line: #e2ded3; --line-strong: #cfc9bb;
+  --fg: #1c1a16; --fg-2: #4f4b43; --muted: #8a8578;
   --primary: var(--accent);
-  --ok: #18794e; --ok-soft: #e7f6ee; --warn: #a35200; --warn-soft: #fff1e0; --danger: #cd2b31; --danger-soft: #fdecec;
-  --info: #0b68cb; --info-soft: #e9f2fd; --neutral-soft: #f0f0f3;
+  --ok: #2f7a4f; --ok-soft: #e4efe3; --warn: #a2580c; --warn-soft: #f6ead6; --danger: #b8322a; --danger-soft: #f6e3df;
+  --info: #2c5f9e; --info-soft: #e3eaf3; --neutral-soft: #ebe8e0;
   --chart-ok: #2f6fd6; --chart-fail: #d9532b;
-  --st-unused: #2f6fd6; --st-partial: #c8681c; --st-full: #16835f; --st-disabled: #a1a1aa;
-  --shadow-xs: 0 1px 2px rgb(17 17 20 / 5%);
-  --shadow-sm: 0 1px 3px rgb(17 17 20 / 6%), 0 1px 2px rgb(17 17 20 / 4%);
-  --shadow-lg: 0 24px 48px -12px rgb(17 17 20 / 22%), 0 8px 16px -8px rgb(17 17 20 / 10%);
+  --st-unused: #2f6fd6; --st-partial: #c8681c; --st-full: #16835f; --st-disabled: #aaa496;
+  /* 墨 · ink sidebar (dark in both themes) */
+  --ink: #1a1813; --ink-2: #24211b; --ink-line: #322e26; --ink-fg: #ece7da; --ink-muted: #8f897b;
+  --shadow-xs: 0 1px 2px rgb(40 32 16 / 6%);
+  --shadow-sm: 0 1px 3px rgb(40 32 16 / 8%), 0 1px 2px rgb(40 32 16 / 5%);
+  --shadow-lg: 0 28px 56px -16px rgb(40 32 16 / 28%), 0 8px 20px -10px rgb(40 32 16 / 14%);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0b0b0d; --surface: #131316; --surface-2: #1a1a1e; --surface-3: #25252b; --hover: #1c1c21;
-    --line: #26262c; --line-strong: #36363e;
-    --fg: #ededf0; --fg-2: #b7b7c0; --muted: #858590;
-    --primary: color-mix(in oklab, var(--accent) 80%, white);
-    --ok: #4cc38a; --ok-soft: #10261b; --warn: #f0a24a; --warn-soft: #2b1d0c; --danger: #ff6369; --danger-soft: #2f1416;
-    --info: #70b8ff; --info-soft: #0f2238; --neutral-soft: #1f1f24;
+    --bg: #12110e; --surface: #191814; --surface-2: #211f1a; --surface-3: #2c2a23; --hover: #1f1d18;
+    --line: #2b2923; --line-strong: #3b3830;
+    --fg: #ece7dc; --fg-2: #bfb9ab; --muted: #8b8577;
+    --primary: color-mix(in oklab, var(--accent) 78%, white);
+    --ok: #6cc08f; --ok-soft: #16261b; --warn: #e3a453; --warn-soft: #2c210f; --danger: #f07a68; --danger-soft: #2f1915;
+    --info: #86b1ea; --info-soft: #172334; --neutral-soft: #24221c;
     --chart-ok: #4a86e8; --chart-fail: #e0603a;
-    --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5f6a;
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 70%);
+    --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5b51;
+    --ink: #0c0b09; --ink-2: #171510; --ink-line: #24221c;
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 28px 56px -16px rgb(0 0 0 / 75%);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b0b0d; --surface: #131316; --surface-2: #1a1a1e; --surface-3: #25252b; --hover: #1c1c21;
-  --line: #26262c; --line-strong: #36363e;
-  --fg: #ededf0; --fg-2: #b7b7c0; --muted: #858590;
-  --primary: color-mix(in oklab, var(--accent) 80%, white);
-  --ok: #4cc38a; --ok-soft: #10261b; --warn: #f0a24a; --warn-soft: #2b1d0c; --danger: #ff6369; --danger-soft: #2f1416;
-  --info: #70b8ff; --info-soft: #0f2238; --neutral-soft: #1f1f24;
+  --bg: #12110e; --surface: #191814; --surface-2: #211f1a; --surface-3: #2c2a23; --hover: #1f1d18;
+  --line: #2b2923; --line-strong: #3b3830;
+  --fg: #ece7dc; --fg-2: #bfb9ab; --muted: #8b8577;
+  --primary: color-mix(in oklab, var(--accent) 78%, white);
+  --ok: #6cc08f; --ok-soft: #16261b; --warn: #e3a453; --warn-soft: #2c210f; --danger: #f07a68; --danger-soft: #2f1915;
+  --info: #86b1ea; --info-soft: #172334; --neutral-soft: #24221c;
   --chart-ok: #4a86e8; --chart-fail: #e0603a;
-  --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5f6a;
-  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -12px rgb(0 0 0 / 70%);
+  --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5b51;
+  --ink: #0c0b09; --ink-2: #171510; --ink-line: #24221c;
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 28px 56px -16px rgb(0 0 0 / 75%);
 }
 :root {
   --primary-hover: color-mix(in oklab, var(--primary) 88%, black);
-  --primary-soft: color-mix(in oklab, var(--primary) 11%, var(--surface));
+  --primary-soft: color-mix(in oklab, var(--primary) 10%, var(--surface));
   --primary-strong: color-mix(in oklab, var(--primary) 82%, var(--fg));
   --on-primary: #ffffff;
 }
 
 @theme inline {
   --font-sans: "Inter Variable", system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  /* Display: Fraunces for Latin and numerals; CJK falls back to a system serif where one exists, else the UI sans. */
+  --font-display: "Fraunces Variable", "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --color-bg: var(--bg); --color-surface: var(--surface); --color-surface-2: var(--surface-2); --color-surface-3: var(--surface-3); --color-hover: var(--hover);
   --color-line: var(--line); --color-line-strong: var(--line-strong);
@@ -67,6 +76,7 @@
   --color-chart-ok: var(--chart-ok); --color-chart-fail: var(--chart-fail);
   --color-st-unused: var(--st-unused); --color-st-partial: var(--st-partial); --color-st-full: var(--st-full); --color-st-disabled: var(--st-disabled);
   --color-product: var(--product, #64748b);
+  --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-ink-line: var(--ink-line); --color-ink-fg: var(--ink-fg); --color-ink-muted: var(--ink-muted);
   --shadow-xs: var(--shadow-xs); --shadow-sm: var(--shadow-sm); --shadow-lg: var(--shadow-lg);
 }
 
@@ -90,18 +100,22 @@
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
   /* Sign-in brand panel: accent-tinted mesh over a fine grid, all derived from --accent. */
+  /* Sign-in panel: ink ground, a soft seal-red glow and paper grain, all derived from --accent. */
   .brand-panel {
-    background-color: color-mix(in oklab, var(--accent) 18%, #0a0a10);
+    background-color: var(--ink);
     background-image:
-      radial-gradient(60% 50% at 15% 10%, color-mix(in oklab, var(--accent) 70%, transparent), transparent 70%),
-      radial-gradient(50% 45% at 90% 85%, color-mix(in oklab, var(--accent) 45%, #ff7a59 20%), transparent 70%),
-      radial-gradient(40% 40% at 70% 30%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%);
+      radial-gradient(70% 55% at 85% 100%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
+      radial-gradient(45% 40% at 10% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%);
   }
+  /* Fine ruled lines, like letter paper. */
   .brand-grid {
-    background-image: linear-gradient(rgb(255 255 255 / 6%) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 6%) 1px, transparent 1px);
-    background-size: 32px 32px;
-    mask-image: radial-gradient(ellipse at 30% 30%, black 30%, transparent 75%);
+    background-image: linear-gradient(rgb(255 255 255 / 5%) 1px, transparent 1px);
+    background-size: 100% 28px;
+    mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);
   }
+  .font-display { font-family: var(--font-display); font-optical-sizing: auto; letter-spacing: -0.01em; }
+  /* Hairline rules that fade at both ends, used between editorial sections instead of boxes. */
+  .rule { height: 1px; background: linear-gradient(90deg, var(--line-strong), var(--line) 40%, transparent); }
 }
 
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }

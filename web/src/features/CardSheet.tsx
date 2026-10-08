@@ -51,13 +51,14 @@ export function CardSheet({ cardId, onClose }: { cardId: string; onClose: () => 
   const dirty = data && draft ? EDITABLE.filter(k => draft[k].trim() !== (data[k] || '').trim()) : [];
 
   const header = data ? (
-    <div className="grid gap-2.5">
+    <div className="relative grid gap-2.5">
+      <span className="absolute -inset-x-5 -top-3 h-1 md:-top-5" style={{ background: product(data.productId).color }} aria-hidden />
       <div className="flex items-center gap-2">
         <ProductChip product={product(data.productId)} />
         <StateBadge state={data.state} />
         <IconButton label="关闭" size="sm" data-dialog-close="" className="-mr-2 ml-auto" onClick={close}><X className="size-4" /></IconButton>
       </div>
-      <h2 className="text-lg font-semibold leading-snug">{cardTitle(data)}</h2>
+      <h2 className="font-display text-2xl leading-snug font-semibold">{cardTitle(data)}</h2>
       <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-muted">
         <Meter used={data.usedDevices} max={data.maxDevices} /><span>·</span><span>{data.edition}</span><span>·</span><span>创建于 {dateTime(data.issuedAt)}</span>
       </div>

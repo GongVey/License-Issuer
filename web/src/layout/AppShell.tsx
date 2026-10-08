@@ -9,8 +9,7 @@ import type { Dashboard } from '../lib/types';
 import { useOverlays } from '../overlays';
 import { useSession } from '../session';
 import { IconButton } from '../ui/controls';
-import { ProductAvatar } from '../ui/display';
-import { BrandMark } from './Logo';
+import { BrandMark, Wordmark } from './Logo';
 
 export const NAV = [
   { path: '/overview', label: '概览', icon: LayoutDashboard },
@@ -21,17 +20,20 @@ export const NAV = [
 // Phone tab bar: four destinations around a central "generate" action; batches live under the cards tab.
 const TABS = [NAV[0], NAV[1], null, NAV[3], { path: '/settings', label: '设置', icon: Settings }];
 
-function NavItem({ to, active, icon, children, trailing }: { to: string; active: boolean; icon: ReactNode; children: ReactNode; trailing?: ReactNode }) {
+// Ink sidebar item: the active entry gets a seal-red rule on its left edge.
+function InkItem({ to, active, icon, children, trailing }: { to: string; active: boolean; icon: ReactNode; children: ReactNode; trailing?: ReactNode }) {
   return (
     <a href={to} aria-current={active ? 'page' : undefined}
-      className={cn('group flex h-8 items-center gap-2.5 rounded-lg px-2 text-[13px] font-medium text-fg-2 transition-colors hover:bg-surface-3/60 hover:text-fg',
-        active && 'bg-surface text-fg shadow-xs ring-1 ring-line hover:bg-surface')}>
-      <span className={cn('grid size-4 place-items-center text-muted group-hover:text-fg-2 [&>svg]:size-4', active && 'text-primary group-hover:text-primary')}>{icon}</span>
+      className={cn('group relative flex h-9 items-center gap-3 rounded-md px-3 text-[13px] font-medium text-ink-fg/70 transition-colors hover:bg-ink-2 hover:text-ink-fg',
+        active && 'bg-ink-2 text-ink-fg')}>
+      {active && <span className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-primary" aria-hidden />}
+      <span className={cn('grid size-4 place-items-center text-ink-muted group-hover:text-ink-fg/80 [&>svg]:size-4', active && 'text-ink-fg')}>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {trailing}
     </a>
   );
 }
+const Label = ({ children }: { children: ReactNode }) => <p className="px-3 pb-2 text-[10.5px] font-semibold tracking-[0.14em] text-ink-muted uppercase">{children}</p>;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { path, params } = useRoute();
@@ -42,6 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const brand = settings.branding;
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>(`/api/dashboard${qs({ tz: new Date().getTimezoneOffset() })}`), refetchInterval: 60000 });
   const stock = new Map(dashboard.data?.products.map(p => [p.productId, p.unused]));
+  const productFilter = path === '/cards' ? params.get('productId') : null;
   const tabActive = (p: string) => path === p || (p === '/cards' && path === '/batches');
   const logout = async () => { try { await api('/api/logout', 'POST', {}); } catch { /* ignore */ } signOut(); };
 
@@ -66,72 +69,82 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [openLookup, openGenerate]);
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[248px_minmax(0,1fr)]">
-      {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-line bg-surface-2/60 md:flex">
-        <div className="flex items-center gap-2.5 px-4 pt-4 pb-3">
-          <BrandMark name={brand.name} />
-          <div className="min-w-0 leading-tight"><p className="truncate text-[13px] font-semibold">{brand.name}</p>{brand.tagline && <p className="truncate text-xs text-muted">{brand.tagline}</p>}</div>
-        </div>
-        <div className="flex gap-1.5 px-3 pb-3">
+    <div className="min-h-dvh md:grid md:grid-cols-[256px_minmax(0,1fr)]">
+      {/* 墨 · desktop sidebar */}
+      <aside className="sticky top-0 hidden h-dvh flex-col bg-ink text-ink-fg md:flex">
+        <a href="#/overview" className="flex items-center gap-3 px-5 pt-6 pb-6">
+          <BrandMark name={brand.name} className="size-9 text-base" />
+          <div className="min-w-0 leading-tight">
+            <Wordmark name={brand.name} className="block truncate text-[17px] text-ink-fg" />
+            {brand.tagline && <p className="mt-0.5 truncate text-[11.5px] text-ink-muted">{brand.tagline}</p>}
+          </div>
+        </a>
+        <div className="px-3 pb-5">
           <button type="button" onClick={() => openLookup()}
-            className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg border border-line bg-surface px-2.5 text-[13px] text-muted shadow-xs transition-colors hover:border-line-strong hover:text-fg-2">
-            <Search className="size-3.5 shrink-0" /><span className="flex-1 truncate text-left">搜索</span>
-            <kbd className="rounded border border-line px-1 font-sans text-[10.5px] text-muted">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+            className="flex h-9 w-full items-center gap-2.5 rounded-md border border-ink-line bg-ink-2/60 px-3 text-[13px] text-ink-muted transition-colors hover:border-ink-fg/20 hover:text-ink-fg/80">
+            <Search className="size-4 shrink-0" /><span className="flex-1 text-left">搜索卡密、机器码…</span>
+            <kbd className="font-sans text-[11px] text-ink-muted/80">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
           </button>
-          <IconButton label="生成卡密（N）" variant="primary" size="sm" className="md:size-8" onClick={() => openGenerate()}><Plus /></IconButton>
         </div>
-        <nav aria-label="主导航" className="grid gap-0.5 px-3">
-          {NAV.map(({ path: p, label, icon: Icon }) => <NavItem key={p} to={`#${p}`} active={path === p && !(p === '/cards' && params.get('productId'))} icon={<Icon />}>{label}</NavItem>)}
+        <nav aria-label="主导航" className="px-3">
+          <Label>工作台</Label>
+          <div className="grid gap-0.5">
+            {NAV.map(({ path: p, label, icon: Icon }) => <InkItem key={p} to={`#${p}`} active={path === p && !productFilter} icon={<Icon />}>{label}</InkItem>)}
+          </div>
         </nav>
-        <div className="mt-5 min-h-0 flex-1 overflow-y-auto px-3">
-          <p className="px-2 pb-1.5 text-[11px] font-medium tracking-wide text-muted">产品</p>
+        <div className="mt-7 min-h-0 flex-1 overflow-y-auto px-3">
+          <Label>产品 · {settings.products.length}</Label>
           <div className="grid gap-0.5">
             {settings.products.map(p => (
-              <NavItem key={p.id} to={href('/cards', { productId: p.id })} active={path === '/cards' && params.get('productId') === p.id}
-                icon={<ProductAvatar id={p.id} name={p.name} color={p.color} size="sm" className="size-4 rounded-[4px] text-[9px]" />}
-                trailing={stock.has(p.id) && <span className="tabular text-xs text-muted" title="可售库存">{stock.get(p.id)}</span>}>
+              <InkItem key={p.id} to={href('/cards', { productId: p.id })} active={productFilter === p.id}
+                icon={<span className="size-2.5 rounded-full ring-[3px] ring-white/10" style={{ background: p.color }} />}
+                trailing={stock.has(p.id) && <span className="tabular rounded bg-ink-2 px-1.5 text-[11px] text-ink-muted group-hover:text-ink-fg/80" title="可售库存">{stock.get(p.id)}</span>}>
                 {p.name}
-              </NavItem>
+              </InkItem>
             ))}
           </div>
         </div>
-        <div className="grid gap-0.5 border-t border-line px-3 py-3">
-          <NavItem to="#/settings" active={path === '/settings'} icon={<Settings />}>设置</NavItem>
-          <div className="mt-1 flex items-center gap-2 px-1">
-            <span className="grid size-7 place-items-center rounded-full bg-surface-3 text-xs font-semibold uppercase text-fg-2">{session.username.slice(0, 1)}</span>
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{session.username}</span>
-            <IconButton label={dark ? '切换到浅色' : '切换到深色'} size="sm" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
-            <IconButton label="退出登录" size="sm" onClick={logout}><LogOut /></IconButton>
+        <div className="grid gap-1 px-3 pt-3 pb-4">
+          <button type="button" onClick={() => openGenerate()}
+            className="mb-2 flex h-10 items-center justify-center gap-2 rounded-md bg-primary text-[13px] font-semibold text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] transition-colors hover:bg-primary-hover">
+            <Plus className="size-4" />生成卡密<kbd className="ml-1 rounded bg-black/15 px-1.5 font-sans text-[11px] font-medium">N</kbd>
+          </button>
+          <InkItem to="#/settings" active={path === '/settings'} icon={<Settings />}>设置</InkItem>
+          <div className="mt-2 flex items-center gap-2.5 border-t border-ink-line px-1 pt-3">
+            <span className="grid size-8 place-items-center rounded-full bg-ink-2 font-display text-sm font-semibold uppercase text-ink-fg ring-1 ring-ink-line">{session.username.slice(0, 1)}</span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{session.username}</span><span className="block text-[11px] text-ink-muted">管理员</span></span>
+            <IconButton label={dark ? '切换到浅色' : '切换到深色'} size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
+            <IconButton label="退出登录" size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={logout}><LogOut /></IconButton>
           </div>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-col">
         {/* Phone top bar */}
-        <header className="sticky top-0 z-20 border-b border-line bg-bg/85 pt-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
+        <header className="sticky top-0 z-20 border-b border-line bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
           <div className="flex h-14 items-center gap-2.5 px-4">
-            <BrandMark name={brand.name} className="size-8" />
-            <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{brand.name}</span>
+            <BrandMark name={brand.name} />
+            <Wordmark name={brand.name} className="min-w-0 flex-1 truncate text-[17px]" />
             <IconButton label="搜索" variant="secondary" className="size-10" onClick={() => openLookup()}><Search /></IconButton>
             <IconButton label={dark ? '切换到浅色' : '切换到深色'} variant="secondary" className="size-10" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1320px] flex-1 px-4 pt-5 pb-[calc(96px+env(safe-area-inset-bottom))] md:px-10 md:pt-9 md:pb-14">{children}</main>
+        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-6 pb-[calc(100px+env(safe-area-inset-bottom))] md:px-12 md:pt-12 md:pb-16">{children}</main>
       </div>
 
       {/* Phone tab bar */}
-      <nav aria-label="主导航" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/90 backdrop-blur-md md:hidden">
+      <nav aria-label="主导航" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/92 backdrop-blur-md md:hidden">
         <div className="grid h-16 grid-cols-5">
           {TABS.map((tab, i) => tab ? (
             <a key={tab.path} href={href(tab.path)} aria-current={tabActive(tab.path) ? 'page' : undefined}
-              className={cn('flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted', tabActive(tab.path) && 'text-primary')}>
-              <tab.icon className="size-[22px]" strokeWidth={tabActive(tab.path) ? 2.2 : 1.8} />{tab.label}
+              className={cn('relative flex flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted', tabActive(tab.path) && 'text-fg')}>
+              {tabActive(tab.path) && <span className="absolute top-0 h-[2px] w-8 rounded-full bg-primary" aria-hidden />}
+              <tab.icon className="size-[22px]" strokeWidth={tabActive(tab.path) ? 2.1 : 1.7} />{tab.label}
             </a>
           ) : (
             <div key={i} className="grid place-items-center">
               <button type="button" aria-label="生成卡密" onClick={() => openGenerate()}
-                className="-mt-5 grid size-14 place-items-center rounded-2xl bg-primary text-on-primary shadow-lg ring-4 ring-bg transition-transform active:scale-95">
+                className="-mt-6 grid size-14 place-items-center rounded-full bg-primary text-on-primary shadow-lg ring-[5px] ring-bg transition-transform active:scale-95">
                 <Plus className="size-6" strokeWidth={2.4} />
               </button>
             </div>

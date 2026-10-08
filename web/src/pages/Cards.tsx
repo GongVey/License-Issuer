@@ -8,11 +8,11 @@ import { useDebounced, useIsDesktop, useNow } from '../lib/hooks';
 import { useRefreshCards } from '../lib/queries';
 import { navigate, useRoute } from '../lib/router';
 import { storage } from '../lib/storage';
-import type { Batch, Card, CardState, Page } from '../lib/types';
+import type { Batch, Card, CardState, Dashboard, Page } from '../lib/types';
 import { useOverlays } from '../overlays';
 import { useSession } from '../session';
-import { Button, Checkbox, IconButton, Input, Segmented, Select } from '../ui/controls';
-import { Empty, ListSkeleton, Meter, Pagination, Panel, ProductChip, StateBadge } from '../ui/display';
+import { Button, Checkbox, IconButton, Input, Select } from '../ui/controls';
+import { Empty, ListSkeleton, Meter, Pagination, Panel, ProductAvatar, ProductChip, StateBadge } from '../ui/display';
 import { useConfirm, useToast } from '../ui/feedback';
 import { PageHeader } from './PageHeader';
 import { SectionTabs } from './SectionTabs';
@@ -23,7 +23,7 @@ const STATES: Array<{ value: '' | CardState; label: string }> = [
 
 export function CardsPage() {
   const { params } = useRoute();
-  const { settings } = useSession();
+  const { settings, product } = useSession();
   const { openCard, openGenerate } = useOverlays();
   const toast = useToast(); const confirm = useConfirm(); const refresh = useRefreshCards();
   const desktop = useIsDesktop();
@@ -73,52 +73,73 @@ export function CardsPage() {
   const exportUrl = `/api/cards/export${qs({ q: filters.q, productId: filters.productId, state: filters.state, batchId: filters.batchId })}`;
   const batchLabel = batch.data ? (batch.data.customer || batch.data.note || `批次 ${batch.data.batchId.slice(0, 8)}`) : '批次';
 
+  // State tab counts come from the overview totals (scoped to the product filter); hidden while a text/batch filter narrows the list.
+  const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: () => api<Dashboard>(`/api/dashboard${qs({ tz: new Date().getTimezoneOffset() })}`) });
+  const scope = dashboard.data?.products.filter(p => !filters.productId || p.productId === filters.productId) ?? [];
+  const counts: Record<string, number> | null = filters.q || filters.batchId || !dashboard.data ? null : {
+    '': scope.reduce((s, p) => s + p.total, 0),
+    ...Object.fromEntries((['unused', 'partial', 'full', 'disabled'] as const).map(k => [k, scope.reduce((s, p) => s + p[k], 0)])),
+  };
+  const activeProduct = filters.productId ? product(filters.productId) : null;
+
   return (
     <>
-      <PageHeader title="卡密" description={list.data ? `共 ${list.data.total} 张${filtered ? '符合条件' : ''}` : ' '} tabs={<SectionTabs />}
+      <SectionTabs />
+      <PageHeader eyebrow={activeProduct ? <span className="inline-flex items-center gap-1.5">产品 · {activeProduct.name}</span> : '授权管理'}
+        title={activeProduct ? <span className="inline-flex items-center gap-3"><ProductAvatar id={activeProduct.id} name={activeProduct.name} color={activeProduct.color} size="lg" className="size-9 rounded-[10px] md:size-10" />{activeProduct.name}</span> : '卡密'}
+        meta={list.data ? `${list.data.total} 张${filtered ? '符合条件' : ''}` : undefined}
         actions={<>
-          <Button icon={<Download className="size-4" />} title="按当前筛选导出 CSV（不含卡密明文）" onClick={() => { location.href = exportUrl; }} className="max-md:hidden">导出</Button>
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => openGenerate({ productId: filters.productId || undefined })} className="max-md:hidden">生成卡密</Button>
-          {!desktop && <IconButton label={selecting ? '退出选择' : '多选'} variant="secondary" onClick={() => selecting ? clear() : setSelecting(true)}>{selecting ? <X className="size-4" /> : <CheckSquare className="size-4" />}</IconButton>}
-        </>} />
+          <Button icon={<Download />} title="按当前筛选导出 CSV（不含卡密明文）" onClick={() => { location.href = exportUrl; }} className="max-md:hidden">导出</Button>
+          <Button variant="primary" icon={<Plus />} onClick={() => openGenerate({ productId: filters.productId || undefined })} className="max-md:hidden">生成卡密</Button>
+          {!desktop && <IconButton label={selecting ? '退出选择' : '多选'} variant="secondary" onClick={() => selecting ? clear() : setSelecting(true)}>{selecting ? <X /> : <CheckSquare />}</IconButton>}
+        </>}
+        tabs={
+          <nav aria-label="状态" className="-mx-4 flex gap-6 overflow-x-auto px-4 shadow-[inset_0_-1px_0_var(--line)] scrollbar-none md:mx-0 md:px-0">
+            {STATES.map(({ value, label }) => (
+              <button key={value} type="button" aria-current={filters.state === value ? 'true' : undefined} onClick={() => update({ state: value })}
+                className={cn('relative flex h-11 shrink-0 items-center gap-2 border-b-2 text-[13px] font-medium transition-colors',
+                  filters.state === value ? 'border-primary text-fg' : 'border-transparent text-muted hover:text-fg')}>
+                {label}
+                {counts && <span className={cn('tabular rounded-full px-1.5 py-px text-[11px]', filters.state === value ? 'bg-primary-soft text-primary-strong' : 'bg-surface-2 text-muted')}>{counts[value]}</span>}
+              </button>
+            ))}
+          </nav>
+        } />
 
-      <Panel className="overflow-hidden">
-        <div className="grid gap-2.5 border-b border-line p-3 md:flex md:flex-wrap md:items-center">
-          <div className="relative md:min-w-64 md:flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <Input id="page-search" type="search" className="pl-9" placeholder="搜索客户、备注、订单号、渠道或卡 ID" value={search} onChange={e => setSearch(e.target.value)} aria-label="搜索卡密" />
-          </div>
-          <div className="flex gap-2 overflow-x-auto scrollbar-none">
-            <Select className="w-32 shrink-0" aria-label="产品" value={filters.productId} onChange={e => update({ productId: e.target.value })}>
-              <option value="">全部产品</option>{settings.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </Select>
-            <Segmented label="状态" value={filters.state} onChange={v => update({ state: v })} options={STATES} className="shrink-0" />
-          </div>
-          {filters.batchId && (
-            <span className="inline-flex h-8 w-fit items-center gap-1 rounded-full bg-primary-soft pr-1 pl-3 text-[13px] font-medium text-primary">
-              {batchLabel}{batch.data && `（${batch.data.cards} 张）`}
-              <IconButton label="清除批次筛选" size="sm" className="size-6 md:size-6 text-primary" onClick={() => update({ batchId: '' })}><X className="size-3.5" /></IconButton>
-            </span>
-          )}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1 basis-60">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
+          <Input id="page-search" type="search" className="pl-9 md:h-9" placeholder="搜索客户、备注、订单号、渠道或卡 ID" value={search} onChange={e => setSearch(e.target.value)} aria-label="搜索卡密" />
         </div>
+        <Select className="w-36 shrink-0 [&_select]:md:h-9" aria-label="产品" value={filters.productId} onChange={e => update({ productId: e.target.value })}>
+          <option value="">全部产品</option>{settings.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </Select>
+        {filters.batchId && (
+          <span className="inline-flex h-9 items-center gap-1 rounded-full bg-primary-soft pr-1 pl-3 text-[13px] font-medium text-primary-strong">
+            批次：{batchLabel}{batch.data && `（${batch.data.cards} 张）`}
+            <IconButton label="清除批次筛选" size="sm" className="size-7 md:size-7 text-primary-strong" onClick={() => update({ batchId: '' })}><X /></IconButton>
+          </span>
+        )}
+      </div>
 
+      <Panel className="overflow-hidden rounded-2xl">
         {selected.size > 0 && (
-          <div className="sticky top-14 z-10 flex flex-wrap items-center gap-2 border-b border-line bg-primary-soft px-3 py-2 md:top-16">
-            <strong className="mr-1 text-[13px] text-primary">已选 {selected.size} 张</strong>
-            <Button size="sm" icon={<Ban className="size-4" />} onClick={() => bulkStatus('disabled')} disabled={selected.size > 100}>停用</Button>
-            <Button size="sm" icon={<PlayCircle className="size-4" />} onClick={() => bulkStatus('active')} disabled={selected.size > 100}>恢复</Button>
-            <Button size="sm" variant="danger-ghost" icon={<Trash2 className="size-4" />} onClick={bulkDelete} disabled={selected.size > 100}>删除</Button>
-            {selected.size > 100 && <span className="text-xs text-danger">一次最多操作 100 张</span>}
-            <Button size="sm" variant="ghost" className="ml-auto max-md:hidden" onClick={clear}>取消选择</Button>
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-ink px-3 py-2 text-ink-fg">
+            <strong className="mr-2 text-[13px]">已选 {selected.size} 张</strong>
+            <Button size="sm" icon={<Ban />} onClick={() => bulkStatus('disabled')} disabled={selected.size > 100}>停用</Button>
+            <Button size="sm" icon={<PlayCircle />} onClick={() => bulkStatus('active')} disabled={selected.size > 100}>恢复</Button>
+            <Button size="sm" variant="danger" icon={<Trash2 />} onClick={bulkDelete} disabled={selected.size > 100}>删除</Button>
+            {selected.size > 100 && <span className="text-xs text-ink-fg/80">一次最多操作 100 张</span>}
+            <button type="button" className="ml-auto text-[13px] text-ink-muted hover:text-ink-fg max-md:hidden" onClick={clear}>取消选择</button>
           </div>
         )}
 
         {list.isLoading ? <ListSkeleton /> : list.error ? <Empty icon={<CreditCard />} title="加载失败" description={(list.error as Error).message} />
           : items.length === 0 ? (
             <Empty icon={<CreditCard />} title={filtered ? '没有符合条件的卡密' : '还没有卡密'} description={filtered ? '试试调整搜索词或筛选条件。' : '生成第一批卡密，发给客户激活即可。'}
-              action={!filtered && <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => openGenerate()}>生成卡密</Button>} />
+              action={!filtered && <Button variant="primary" icon={<Plus />} onClick={() => openGenerate()}>生成卡密</Button>} />
           ) : desktop ? (
-            <CardTable items={items} selected={selected} pageSelected={pageSelected} onToggle={toggle} onOpen={openCard}
+            <CardTable items={items} selected={selected} pageSelected={pageSelected} onToggle={toggle} onOpen={openCard} hideProduct={Boolean(filters.productId)}
               onToggleAll={on => setSelected(prev => { const next = new Map(prev); for (const c of items) { if (on) next.set(c.cardId, c); else next.delete(c.cardId); } return next; })} />
           ) : (
             <div className={cn('divide-y divide-line', list.isFetching && 'opacity-70')}>
@@ -134,8 +155,8 @@ export function CardsPage() {
   );
 }
 
-function CardTable({ items, selected, pageSelected, onToggle, onToggleAll, onOpen }: {
-  items: Card[]; selected: Map<string, Card>; pageSelected: number; onToggle: (c: Card) => void; onToggleAll: (on: boolean) => void; onOpen: (id: string) => void;
+function CardTable({ items, selected, pageSelected, onToggle, onToggleAll, onOpen, hideProduct }: {
+  items: Card[]; selected: Map<string, Card>; pageSelected: number; onToggle: (c: Card) => void; onToggleAll: (on: boolean) => void; onOpen: (id: string) => void; hideProduct: boolean;
 }) {
   const { product } = useSession();
   const now = useNow();
@@ -143,18 +164,18 @@ function CardTable({ items, selected, pageSelected, onToggle, onToggleAll, onOpe
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-left">
-        <thead><tr className="border-b border-line bg-surface-2/50 text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
+        <thead><tr className="border-b border-line text-[11px] tracking-[0.08em] text-muted uppercase [&>th]:px-3 [&>th]:pt-3.5 [&>th]:pb-2.5 [&>th]:font-semibold [&>th]:whitespace-nowrap">
           <th className="w-10 !pl-4"><Checkbox aria-label="选择本页全部" checked={all.checked} ref={el => { if (el) el.indeterminate = all.indeterminate; }} onChange={e => onToggleAll(e.target.checked)} /></th>
-          <th>产品</th><th>客户 / 备注</th><th>设备</th><th>状态</th><th className="hidden lg:table-cell">最近活跃</th><th>创建</th>
+          {!hideProduct && <th>产品</th>}<th>客户 / 备注</th><th>设备</th><th>状态</th><th className="hidden lg:table-cell">最近活跃</th><th>创建</th>
         </tr></thead>
         <tbody>
           {items.map(card => {
             const sub = cardSubtitle(card); const isOn = selected.has(card.cardId);
             return (
               <tr key={card.cardId} tabIndex={0} onClick={() => onOpen(card.cardId)} onKeyDown={e => { if (e.key === 'Enter') onOpen(card.cardId); if (e.key === ' ') { e.preventDefault(); onToggle(card); } }}
-                className={cn('cursor-pointer border-b border-line last:border-b-0 hover:bg-hover [&>td]:px-3 [&>td]:py-3', isOn && 'bg-primary-soft/50 hover:bg-primary-soft/60')}>
+                className={cn('cursor-pointer border-b border-line last:border-b-0 hover:bg-hover [&>td]:px-3 [&>td]:py-3.5', isOn && 'bg-primary-soft/50 hover:bg-primary-soft/60')}>
                 <td className="!pl-4" onClick={e => { e.stopPropagation(); onToggle(card); }}><Checkbox aria-label={`选择 ${cardTitle(card)}`} checked={isOn} onChange={() => onToggle(card)} onClick={e => e.stopPropagation()} /></td>
-                <td><ProductChip product={product(card.productId)} /></td>
+                {!hideProduct && <td><ProductChip product={product(card.productId)} /></td>}
                 <td className="max-w-[340px]"><p className="truncate font-medium">{cardTitle(card)}</p>{sub && <p className="truncate text-xs text-muted">{sub}</p>}</td>
                 <td><Meter used={card.usedDevices} max={card.maxDevices} /></td>
                 <td><StateBadge state={card.state} /></td>

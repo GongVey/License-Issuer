@@ -7,35 +7,38 @@ import { useTheme } from '../lib/theme';
 import type { PublicBranding } from '../lib/types';
 import { Button, Field, IconButton, Input } from '../ui/controls';
 import { ProductAvatar } from '../ui/display';
-import { BrandMark } from '../layout/Logo';
+import { BrandMark, Wordmark } from '../layout/Logo';
 
 function BrandPanel({ branding }: { branding: PublicBranding | null }) {
   const name = branding?.name ?? cachedBrandName();
   const products = branding?.products ?? [];
   return (
-    <aside className="brand-panel relative hidden overflow-hidden text-white lg:flex lg:flex-col">
+    <aside className="brand-panel relative hidden overflow-hidden text-ink-fg lg:flex lg:flex-col">
       <div className="brand-grid pointer-events-none absolute inset-0" aria-hidden />
-      <div className="relative flex items-center gap-3 p-10">
-        <BrandMark name={name} inverted className="size-9" />
-        <span className="text-[15px] font-semibold tracking-tight">{name}</span>
+      {/* Oversized brand character as a faint watermark, like a seal pressed into paper. */}
+      <span aria-hidden className="pointer-events-none absolute -right-16 -bottom-24 font-display text-[460px] leading-none font-semibold text-white/[0.04] select-none">{Array.from(name.trim())[0]}</span>
+      <div className="relative flex items-center gap-3 p-12">
+        <BrandMark name={name} className="size-10 text-lg" />
+        <Wordmark name={name} className="text-xl text-ink-fg" />
       </div>
-      <div className="relative mt-auto max-w-lg p-10 pb-12">
-        <h2 className="text-[34px] leading-[1.15] font-semibold tracking-tight text-balance">{branding?.tagline || '软件授权与卡密管理'}</h2>
-        <p className="mt-4 text-[15px] leading-relaxed text-white/70">在线激活、离线使用。统一管理卡密、设备额度与激活记录。</p>
+      <div className="relative mt-auto max-w-xl p-12 pb-14">
+        <p className="mb-5 flex items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-ink-muted uppercase"><span className="size-1.5 rounded-full bg-primary" />License Console</p>
+        <h2 className="font-display text-[44px] leading-[1.1] font-semibold text-balance">{branding?.tagline || '软件授权与卡密管理'}</h2>
+        <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-fg/65">在线激活，离线使用。统一管理卡密、设备额度与激活记录。</p>
         {products.length > 0 && (
-          <div className="mt-10">
-            <p className="mb-3 text-xs font-medium tracking-wide text-white/55">已接入 {products.length} 个产品</p>
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-12 border-t border-white/10 pt-6">
+            <p className="mb-4 text-xs text-ink-muted">已接入 {products.length} 个产品</p>
+            <div className="flex flex-wrap gap-x-6 gap-y-3">
               {products.map(p => (
-                <span key={p.id} className="inline-flex h-9 items-center gap-2 rounded-full bg-white/10 py-1 pr-3.5 pl-1.5 text-[13px] font-medium ring-1 ring-white/15 backdrop-blur-sm ring-inset">
-                  <ProductAvatar id={p.id} name={p.name} color={p.color} className="size-6 rounded-full" />{p.name}
+                <span key={p.id} className="inline-flex items-center gap-2.5 text-sm font-medium text-ink-fg/90">
+                  <ProductAvatar id={p.id} name={p.name} color={p.color} className="size-7 rounded-lg" />{p.name}
                 </span>
               ))}
             </div>
           </div>
         )}
       </div>
-      <p className="relative px-10 pb-8 text-xs text-white/45">© {new Date().getFullYear()} {name}</p>
+      <p className="relative px-12 pb-9 text-xs text-ink-muted">© {new Date().getFullYear()} {name}</p>
     </aside>
   );
 }
@@ -45,11 +48,11 @@ export function AuthLayout({ branding, children }: { branding: PublicBranding | 
   const name = branding?.name ?? cachedBrandName();
   useEffect(() => { if (branding) document.title = `登录 · ${branding.name}`; }, [branding]);
   return (
-    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+    <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
       <BrandPanel branding={branding} />
       <main className="relative flex flex-col px-5 pt-[calc(env(safe-area-inset-top)+20px)] pb-8 md:px-10">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5 lg:invisible"><BrandMark name={name} /><span className="font-semibold">{name}</span></div>
+          <div className="flex items-center gap-2.5 lg:invisible"><BrandMark name={name} /><Wordmark name={name} className="text-lg" /></div>
           <IconButton label={dark ? '切换到浅色' : '切换到深色'} variant="secondary" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
         </div>
         <div className="mx-auto my-auto w-full max-w-[380px] py-10">{children}</div>
@@ -69,8 +72,8 @@ export function LoginPage({ message, onSignedIn }: { message?: string; onSignedI
   const name = branding?.name ?? cachedBrandName();
   return (
     <AuthLayout branding={branding}>
-      <h1 className="text-2xl font-semibold tracking-tight">登录 {name}</h1>
-      <p className="mt-1.5 mb-8 text-sm text-muted">使用管理员账号继续。</p>
+      <h1 className="font-display text-[32px] leading-tight font-semibold">欢迎回来</h1>
+      <p className="mt-2 mb-8 text-sm text-muted">登录 {name} 管理后台。</p>
       {branding && branding.products.length > 0 && (
         <div className="-mt-4 mb-7 flex flex-wrap gap-1.5 lg:hidden">
           {branding.products.map(p => (

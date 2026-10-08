@@ -30,24 +30,25 @@ export function BatchesPage() {
 
   return (
     <>
-      <PageHeader title="批次" description="每次生成就是一个批次：可整批导出含卡密的 CSV，或整批停用。" tabs={<SectionTabs />}
+      <SectionTabs />
+      <PageHeader eyebrow="授权管理" title="批次" meta={list.data ? `${list.data.total} 批` : undefined} description="每次生成就是一个批次：可整批导出含卡密的 CSV，或整批停用。"
         actions={<Button variant="primary" className="max-md:hidden" icon={<Plus className="size-4" />} onClick={() => openGenerate()}>生成卡密</Button>} />
-      <Panel className="overflow-hidden">
-        <div className="flex gap-2 border-b border-line p-3">
+      <div className="mb-4 flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
-            <Input id="page-search" type="search" className="pl-9" placeholder="搜索客户、渠道或备注" value={search} onChange={e => setSearch(e.target.value)} aria-label="搜索批次" />
+            <Input id="page-search" type="search" className="pl-9 md:h-9" placeholder="搜索客户、渠道或备注" value={search} onChange={e => setSearch(e.target.value)} aria-label="搜索批次" />
           </div>
-          <Select className="w-32 shrink-0" aria-label="产品" value={filters.productId} onChange={e => update({ productId: e.target.value })}>
+          <Select className="w-36 shrink-0 [&_select]:md:h-9" aria-label="产品" value={filters.productId} onChange={e => update({ productId: e.target.value })}>
             <option value="">全部产品</option>{settings.products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
           </Select>
-        </div>
+      </div>
+      <Panel className="overflow-hidden rounded-2xl">
         {list.isLoading ? <ListSkeleton /> : items.length === 0 ? (
           <Empty icon={<Layers />} title="没有批次" description={filters.q || filters.productId ? '试试调整筛选条件。' : '生成卡密后会自动创建批次。'} />
         ) : desktop ? (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left">
-              <thead><tr className="border-b border-line bg-surface-2/50 text-xs text-muted [&>th]:px-3 [&>th]:py-2.5 [&>th]:font-medium [&>th]:whitespace-nowrap">
+              <thead><tr className="border-b border-line text-[11px] tracking-[0.08em] text-muted uppercase [&>th]:px-3 [&>th]:pt-3.5 [&>th]:pb-2.5 [&>th]:font-semibold [&>th]:whitespace-nowrap">
                 <th className="!pl-4">创建时间</th><th>产品</th><th>客户 / 备注</th><th className="text-right">数量</th><th>已激活</th><th className="text-right">停用</th><th />
               </tr></thead>
               <tbody>{items.map(b => <BatchRow key={b.batchId} batch={b} />)}</tbody>
@@ -90,8 +91,15 @@ function BatchRow({ batch }: { batch: Batch }) {
   const { allDisabled, exportCodes, toggle } = useBatchActions(batch);
   return (
     <tr tabIndex={0} onClick={() => open(batch)} onKeyDown={e => { if (e.key === 'Enter') open(batch); }} title="查看这一批卡密"
-      className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover [&>td]:px-3 [&>td]:py-3">
-      <td className="!pl-4 whitespace-nowrap"><p>{relative(batch.createdAt, now)}</p><p className="text-xs text-muted">{dateTime(batch.createdAt)}</p></td>
+      className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover [&>td]:px-3 [&>td]:py-3.5">
+      <td className="!pl-4 whitespace-nowrap">
+        <span className="flex items-center gap-3">
+          <span className="grid w-11 justify-items-center rounded-lg border border-line bg-surface-2/60 py-1 leading-none">
+            <span className="text-[10px] text-muted">{new Date(batch.createdAt).getMonth() + 1} 月</span><span className="tabular mt-0.5 font-display text-lg font-semibold">{new Date(batch.createdAt).getDate()}</span>
+          </span>
+          <span><span className="block">{relative(batch.createdAt, now)}</span><span className="block text-xs text-muted">{dateTime(batch.createdAt).slice(11)}</span></span>
+        </span>
+      </td>
       <td><ProductChip product={product(batch.productId)} /><p className="text-xs text-muted">{batch.edition} · 每卡 {batch.maxDevices} 台</p></td>
       <td className="max-w-[300px]"><p className="truncate font-medium">{batch.customer || batch.note || '—'}</p><p className="truncate text-xs text-muted">{[batch.customer && batch.note, batch.channel].filter(Boolean).join(' · ')}</p></td>
       <td className="tabular text-right">{batch.cards === batch.quantity ? batch.cards : <span title={`原生成 ${batch.quantity} 张，已删除 ${batch.quantity - batch.cards} 张`}>{batch.cards}/{batch.quantity}</span>}</td>
