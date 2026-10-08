@@ -8,8 +8,11 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
+    "prebuild": "node scripts/check-deps.mjs",
     "build": "vite build",
+    "predev:web": "node scripts/check-deps.mjs",
     "dev:web": "vite",
+    "pretypecheck": "node scripts/check-deps.mjs",
     "typecheck": "tsc -p web --noEmit",
     "check": "for f in server.mjs lib.mjs cards.mjs logs.mjs settings.mjs admin.mjs; do node --check $f || exit 1; done && npm run typecheck",
     "pretest": "npm run build",

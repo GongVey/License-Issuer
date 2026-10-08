@@ -19,7 +19,7 @@ npm run admin:init
 npm start
 ```
 
-服务启动时读取 `dist/` 的快照，重新构建后需重启服务。未构建时访问首页会提示先运行 `npm run build`。
+每次 `git pull` 后都先运行 `npm install`（新版本可能新增依赖）；`npm run build` / `npm run dev:web` 启动前会检查依赖，缺包时会提示。服务启动时读取 `dist/` 的快照，重新构建后需重启服务。未构建时访问首页会提示先运行 `npm run build`。
 
 前端开发：先用 `npm start` 启动本地服务（默认 `127.0.0.1:8787`），再运行 `npm run dev:web` 打开 Vite 开发服务器，`/api` 会代理到本地服务（可用 `API_ORIGIN` 指定其他地址）。`npm run check` 做后端语法检查和前端类型检查。
 
