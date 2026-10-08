@@ -3,8 +3,9 @@ import { HttpError } from './lib.mjs';
 import { fields, DEFAULT_PRODUCTS } from './cards.mjs';
 import { audit } from './logs.mjs';
 
-export const COLORS = ['teal', 'indigo', 'amber', 'rose', 'violet', 'sky', 'lime', 'slate'];
-const DEFAULT_NAMES = { photoarchiver: '照片归档', wallpaper: '壁纸' };
+export const COLORS = ['teal', 'indigo', 'amber', 'rose', 'violet', 'sky', 'koi', 'slate'];
+const DEFAULT_NAMES = { photoarchiver: '照片归档', wallpaper: '一池锦鲤' };
+const DEFAULT_COLORS = { photoarchiver: 'sky', wallpaper: 'koi' };
 export const DEFAULT_TEMPLATE = '您好，感谢购买 {product}！\n\n激活码：{cardCode}\n\n使用方法：打开软件 → 授权 → 粘贴激活码，联网激活一次后即可离线使用。\n每个激活码最多可在 {maxDevices} 台电脑上激活。';
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
 
@@ -19,7 +20,7 @@ export function getSettings(db, config) {
   const names = read(db, 'products', {});
   const templates = read(db, 'templates', {});
   return {
-    products: ids.map((id, i) => ({ id, name: names[id]?.name || DEFAULT_NAMES[id] || id, color: COLORS.includes(names[id]?.color) ? names[id].color : COLORS[i % COLORS.length] })),
+    products: ids.map((id, i) => ({ id, name: names[id]?.name || DEFAULT_NAMES[id] || id, color: COLORS.includes(names[id]?.color) ? names[id].color : DEFAULT_COLORS[id] || COLORS[i % COLORS.length] })),
     templates: Object.fromEntries(ids.map(id => [id, typeof templates[id] === 'string' ? templates[id] : DEFAULT_TEMPLATE])),
     presets: read(db, 'presets', []).filter(preset => ids.includes(preset.productId)),
     editions: config.editions,

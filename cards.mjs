@@ -245,21 +245,19 @@ export function lookup(db, input, config) {
   if (typeof input.query !== 'string' || input.query.length > 200) throw new HttpError(400, '请输入要查找的内容', 'invalid_search');
   const query = input.query.trim();
   const byId = db.prepare(`SELECT ${columns} FROM cards c WHERE c.cardId=?`);
-  const result = (kind, cards, legacy = []) => ({ kind, cards: cards.filter(Boolean).map(cardRow), legacy });
+  const result = (kind, cards) => ({ kind, cards: cards.filter(Boolean).map(cardRow) });
   if (!query) return result('empty', []);
   if (CARD_CODE.test(query.toUpperCase())) {
     return result('cardCode', [db.prepare(`SELECT ${columns} FROM cards c WHERE c.codeHash=?`).get(digest(query.toUpperCase()))]);
   }
   if (FINGERPRINT.test(query.toLowerCase())) {
     const machine = query.toLowerCase();
-    return result('machine', db.prepare(`SELECT ${columns} FROM cards c WHERE c.cardId IN (SELECT cardId FROM activations WHERE machineFingerprint=?) ORDER BY c.issuedAt DESC`).all(machine),
-      db.prepare('SELECT licenseId,machineFingerprint,edition,issuedAt,note,status FROM licenses WHERE machineFingerprint=? ORDER BY issuedAt DESC').all(machine));
+    return result('machine', db.prepare(`SELECT ${columns} FROM cards c WHERE c.cardId IN (SELECT cardId FROM activations WHERE machineFingerprint=?) ORDER BY c.issuedAt DESC`).all(machine));
   }
   if (UUID.test(query.toLowerCase())) {
     const id = query.toLowerCase();
     const activation = db.prepare('SELECT cardId FROM activations WHERE activationId=?').get(id);
-    return result('id', [byId.get(id) || (activation && byId.get(activation.cardId))],
-      db.prepare('SELECT licenseId,machineFingerprint,edition,issuedAt,note,status FROM licenses WHERE licenseId=?').all(id));
+    return result('id', [byId.get(id) || (activation && byId.get(activation.cardId))]);
   }
   return result('text', listCards(db, new URLSearchParams({ q: query, limit: '10' }), config).items);
 }
@@ -375,7 +373,7 @@ function activate(db, input, config, now) {
       if (count >= card.maxDevices) throw fail(409, 'Device limit reached', 'device_limit', card.cardId);
       const payload = { version: 1, licenseId: randomUUID(), cardId: card.cardId, productId, machineFingerprint, edition: card.edition, issuedAt: now };
       const bytes = Buffer.from(JSON.stringify(payload), 'utf8');
-      // Domain separation: GL1 signatures cannot be reused as legacy PA1 licenses.
+      // Domain separation: GL1 signatures stay distinct from any other signed format.
       const code = `GL1.${bytes.toString('base64url')}.${sign(null, Buffer.concat([Buffer.from('GL1.'), bytes]), config.privateKey).toString('base64url')}`;
       db.prepare('INSERT INTO activations (activationId,cardId,machineFingerprint,issuedAt,code,lastSeenAt) VALUES (?,?,?,?,?,?)')
         .run(payload.licenseId, card.cardId, machineFingerprint, now, code, now);

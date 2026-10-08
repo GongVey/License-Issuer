@@ -11,3 +11,5 @@ secrets/
 .env.example
 .env.example
 .env.example
+node_modules/
+dist/

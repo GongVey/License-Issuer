@@ -1,4 +1,4 @@
-"""Independent PA1 verifier, following core/license.rs (no customer data or keys on disk)."""
+"""Independent GL1 verifier mirroring what desktop clients must do (no customer data or keys on disk)."""
 import base64
 import json
 import sys
@@ -12,30 +12,34 @@ def decode(value):
     return raw
 
 
-def verify(code, public_key, machine):
-    version, encoded, signature = code.strip().split('.')
-    assert version == 'PA1'
+def verify(code, public_key, machine, product):
+    prefix, encoded, signature = code.strip().split('.')
+    assert prefix == 'GL1'
     payload_bytes = decode(encoded)
     signature_bytes = decode(signature)
     assert len(signature_bytes) == 64
-    Ed25519PublicKey.from_public_bytes(decode(public_key)).verify(signature_bytes, payload_bytes)
+    # The signed message is the ASCII prefix "GL1." followed by the raw JSON bytes.
+    Ed25519PublicKey.from_public_bytes(decode(public_key)).verify(signature_bytes, b'GL1.' + payload_bytes)
     payload = json.loads(payload_bytes)
+    assert payload['version'] == 1
+    assert payload['productId'] == product
+    assert payload['machineFingerprint'] == machine
     assert isinstance(payload['licenseId'], str) and payload['licenseId'].strip()
     assert isinstance(payload['edition'], str) and payload['edition'].strip()
     assert type(payload['issuedAt']) is int and -(2**63) <= payload['issuedAt'] < 2**63
-    assert payload['machineFingerprint'] == machine
     return payload
 
 
 data = json.load(sys.stdin)
-payload = verify(data['code'], data['publicKey'], data['machine'])
-for invalid_code, invalid_machine in [
-    (data['tampered'], data['machine']),
-    (data['code'], 'sha256:' + 'f' * 64),
-    (data['wrongMessageSignature'], data['machine']),
+payload = verify(data['code'], data['publicKey'], data['machine'], data['product'])
+for invalid_code, invalid_machine, invalid_product in [
+    (data['tampered'], data['machine'], data['product']),
+    (data['code'], 'sha256:' + 'f' * 64, data['product']),
+    (data['code'], data['machine'], 'other-product'),
+    (data['unprefixedSignature'], data['machine'], data['product']),
 ]:
     try:
-        verify(invalid_code, data['publicKey'], invalid_machine)
+        verify(invalid_code, data['publicKey'], invalid_machine, invalid_product)
     except Exception:
         pass
     else:

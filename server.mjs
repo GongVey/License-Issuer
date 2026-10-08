@@ -7,15 +7,22 @@ import { productsFromEnv, createCard, createCards, deleteCards, getCard, listCar
   revealCode, releaseDevice, lookup, listBatches, getBatch, setBatchStatus, allowActivation, activateCard, UUID } from './cards.mjs';
 import { listActivationLog, listAuditLog, audit } from './logs.mjs';
 import { getSettings, saveSettings } from './settings.mjs';
-import { configFromEnv, openDatabase, issueLicense, verifyPassword, hashPassword, allowLogin, digest, token, publicKeyFor, HttpError, requireAdministrator, createAdministratorSession, updateAdministrator, validateUsername, ensureDefaultAdministrator } from './lib.mjs';
+import { configFromEnv, openDatabase, verifyPassword, hashPassword, allowLogin, digest, token, publicKeyFor, HttpError, requireAdministrator, createAdministratorSession, updateAdministrator, validateUsername, ensureDefaultAdministrator } from './lib.mjs';
 
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
-const publicDir = fileURLToPath(new URL('./public/', import.meta.url));
-// Serve a fixed snapshot of public/ taken at startup; request paths are only looked up, never joined onto the file system.
-const assets = new Map(readdirSync(publicDir, { recursive: true })
-  .filter(file => MIME[extname(file)] && statSync(join(publicDir, file)).isFile())
-  .map(file => ['/' + file.split(sep).join('/'), { body: readFileSync(join(publicDir, file)), type: MIME[extname(file)] }]));
-assets.set('/', assets.get('/index.html'));
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml',
+  '.png': 'image/png', '.ico': 'image/x-icon', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json' };
+const distDir = fileURLToPath(new URL('./dist/', import.meta.url));
+// Serve a fixed snapshot of the built console (npm run build) taken at startup; request paths are only looked up, never joined onto the file system.
+function loadAssets() {
+  let files = [];
+  try { files = readdirSync(distDir, { recursive: true }); } catch { return new Map(); }
+  const assets = new Map(files.filter(file => MIME[extname(file)] && statSync(join(distDir, file)).isFile())
+    .map(file => ['/' + file.split(sep).join('/'), { body: readFileSync(join(distDir, file)), type: MIME[extname(file)] }]));
+  if (assets.has('/index.html')) assets.set('/', assets.get('/index.html'));
+  return assets;
+}
+const assets = loadAssets();
+const MISSING_BUILD = Buffer.from('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>License Issuer</title><p>管理后台尚未构建：请在服务器上运行 <code>npm run build</code> 后重启服务。</p>');
 
 async function body(req) {
   if (req.headers['content-type']?.split(';')[0] !== 'application/json') throw new HttpError(415, '请使用 application/json', 'unsupported_media_type');
@@ -77,36 +84,7 @@ export function createApp(config, { clock = Date.now } = {}) {
         return file(readFileSync(path), 'application/vnd.sqlite3', `issuer-backup-${timestamp(c.now)}.sqlite`);
       } finally { try { unlinkSync(path); } catch {} }
     }],
-    // Legacy PhotoArchiver PA1 licenses: kept for compatibility, read-only in the new interface.
-    ['POST', '/api/licenses', async c => {
-      const record = issueLicense(config.privateKey, await c.body(), config.editions, c.now);
-      db.prepare('INSERT INTO licenses VALUES (?,?,?,?,?,?,?)').run(record.licenseId, record.machineFingerprint, record.edition, record.issuedAt, record.note, record.code, record.status);
-      return reply(201, record);
-    }],
-    ['GET', '/api/licenses', c => {
-      const q = c.url.searchParams.get('q') || '';
-      const offset = Number(c.url.searchParams.get('offset') || 0);
-      if (q.length > 200 || !Number.isSafeInteger(offset) || offset < 0 || offset > 10000000) throw new HttpError(400, '无效的搜索条件', 'invalid_search');
-      // instr performs literal search: SQL metacharacters and LIKE wildcards have no special meaning.
-      const where = 'WHERE instr(lower(licenseId || char(10) || machineFingerprint || char(10) || note || char(10) || edition), lower(?)) > 0';
-      const total = db.prepare(`SELECT count(*) AS count FROM licenses ${where}`).get(q).count;
-      const items = db.prepare(`SELECT licenseId,machineFingerprint,edition,issuedAt,note,status FROM licenses ${where} ORDER BY issuedAt DESC, licenseId LIMIT 30 OFFSET ?`).all(q, offset);
-      return { items, total, offset };
-    }],
-    ['GET', new RegExp(`^/api/licenses/${id}$`), (c, licenseId) => legacyLicense(licenseId)],
-    ['PATCH', new RegExp(`^/api/licenses/${id}$`), async (c, licenseId) => {
-      const record = legacyLicense(licenseId);
-      const input = await c.body();
-      if (Object.keys(input).length !== 1 || !['active', 'archived'].includes(input.status)) throw new HttpError(400, '无效的状态', 'invalid_status');
-      db.prepare('UPDATE licenses SET status=? WHERE licenseId=?').run(input.status, record.licenseId);
-      return { ...record, status: input.status };
-    }],
   ];
-  function legacyLicense(licenseId) {
-    const record = db.prepare('SELECT * FROM licenses WHERE licenseId=?').get(licenseId);
-    if (!record) throw new HttpError(404, '许可证不存在', 'license_not_found');
-    return record;
-  }
 
   async function changeAccount(req, url, admin, session) {
     if (!allowLogin(db, req.socket.remoteAddress || 'unknown', config, clock()) || pendingLogins >= 4) throw new HttpError(429, '尝试次数过多，请稍后再试', 'rate_limited');
@@ -157,7 +135,12 @@ export function createApp(config, { clock = Date.now } = {}) {
       }
       if (req.method === 'GET' && assets.has(url.pathname)) {
         const asset = assets.get(url.pathname);
+        // Vite file names carry a content hash, so they can be cached forever; everything else stays no-store.
+        if (url.pathname.startsWith('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         res.writeHead(200, { 'Content-Type': asset.type }); res.end(asset.body); return;
+      }
+      if (req.method === 'GET' && url.pathname === '/' && !assets.size) {
+        res.writeHead(503, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(MISSING_BUILD); return;
       }
       if (url.pathname === '/api/login' && req.method === 'POST') {
         if (!allowLogin(db, req.socket.remoteAddress || 'unknown', config, now)) {

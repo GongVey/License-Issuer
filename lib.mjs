@@ -67,35 +67,18 @@ export function configFromEnv(env) {
     privateKey: loadSigningKey(env), database: resolve(env.DATABASE_PATH || './data/issuer.sqlite'), secure: url.protocol === 'https:',
     sessionMs: 8 * 60 * 60 * 1000, loginWindowMs: 15 * 60 * 1000, loginLimit: 10, globalLoginLimit: 100 };
 }
-export function issueLicense(key, input, editions, now = Date.now()) {
-  if (!input || typeof input !== 'object' || Array.isArray(input) || Object.keys(input).some(x => !['machineFingerprint', 'note', 'edition'].includes(x))) {
-    throw new HttpError(400, '包含不支持的字段', 'invalid_fields');
-  }
-  const { machineFingerprint, edition, note = '' } = input;
-  if (typeof machineFingerprint !== 'string' || !/^sha256:[a-f0-9]{64}$/.test(machineFingerprint)) throw new HttpError(400, '机器码必须是 sha256: 加 64 位小写十六进制', 'invalid_fingerprint');
-  if (!editions.includes(edition)) throw new HttpError(400, '不支持的授权版本', 'invalid_edition');
-  if (typeof note !== 'string' || note.length > 2000 || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(note)) throw new HttpError(400, '备注最多 2000 字且不能包含控制字符', 'invalid_text');
-  const payload = { licenseId: randomUUID(), machineFingerprint, edition, issuedAt: now };
-  const bytes = Buffer.from(JSON.stringify(payload), 'utf8');
-  const code = `PA1.${bytes.toString('base64url')}.${sign(null, bytes, key).toString('base64url')}`;
-  return { ...payload, note, code, status: 'active' };
-}
 export function openDatabase(path) {
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path);
   if (path !== ':memory:' && process.platform !== 'win32') chmodSync(path, 0o600);
   try {
+    // The retired PA1 'licenses' table is no longer created or read; rows in older databases are left untouched.
     db.exec(`PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA foreign_keys=ON;
     BEGIN IMMEDIATE;
     CREATE TABLE IF NOT EXISTS administrators (
       id INTEGER PRIMARY KEY CHECK(id=1), username TEXT NOT NULL UNIQUE,
       passwordHash TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
       mustChangePassword INTEGER NOT NULL DEFAULT 0 CHECK(mustChangePassword IN (0,1)));
-    CREATE TABLE IF NOT EXISTS licenses (
-      licenseId TEXT PRIMARY KEY, machineFingerprint TEXT NOT NULL, edition TEXT NOT NULL,
-      issuedAt INTEGER NOT NULL, note TEXT NOT NULL, code TEXT NOT NULL,
-      status TEXT NOT NULL CHECK(status IN ('active','archived')));
-    CREATE INDEX IF NOT EXISTS licenses_issued ON licenses(issuedAt DESC, licenseId);
     CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, csrf TEXT NOT NULL, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS login_attempts (bucket TEXT PRIMARY KEY, count INTEGER NOT NULL, expires INTEGER NOT NULL);`);
     if (!db.prepare('PRAGMA table_info(administrators)').all().some(column => column.name === 'mustChangePassword')) {

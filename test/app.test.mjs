@@ -12,7 +12,7 @@ import { createApp } from '../server.mjs';
 import { productsFromEnv } from '../cards.mjs';
 import { runAdmin } from '../admin.mjs';
 import { DatabaseSync } from 'node:sqlite';
-import { CLIENT_PUBLIC_KEY, publicKeyFor, assertMatchingKey, hashPassword, verifyPassword, configFromEnv, issueLicense, openDatabase, allowLogin, initializeAdministrator, importAdministrator, updateAdministrator, requireAdministrator, createAdministratorSession } from '../lib.mjs';
+import { CLIENT_PUBLIC_KEY, publicKeyFor, assertMatchingKey, hashPassword, verifyPassword, configFromEnv, openDatabase, allowLogin, initializeAdministrator, importAdministrator, updateAdministrator, requireAdministrator, createAdministratorSession } from '../lib.mjs';
 
 const { privateKey } = generateKeyPairSync('ed25519');
 const machine = 'sha256:' + 'a'.repeat(64);
@@ -142,21 +142,22 @@ async function fixture(t, overrides = {}) {
   return { config, request, login, restart: async () => { await stop(); await start(); }, advance: ms => { now += ms; } };
 }
 
-test('license payload contract and independent Python Ed25519 verification', () => {
+test('GL1 payload contract and independent Python Ed25519 verification', async t => {
   assert.match(CLIENT_PUBLIC_KEY, /^[A-Za-z0-9_-]{43}$/);
-  const record = issueLicense(privateKey, { machineFingerprint: machine, edition: 'standard', note: 'Synthetic only' }, ['standard']);
-  const [, encoded] = record.code.split('.');
+  const f = await fixture(t); await f.login();
+  const card = (await f.request('/api/cards', 'POST', { productId: 'wallpaper', edition: 'standard' })).body;
+  const { license } = (await f.request('/api/v1/activate', 'POST', { cardCode: card.cardCode, productId: 'wallpaper', machineFingerprint: machine })).body;
+  const [, encoded, signature] = license.split('.');
   const tamperedPayload = { ...JSON.parse(Buffer.from(encoded, 'base64url')), edition: 'changed' };
-  const tampered = `PA1.${Buffer.from(JSON.stringify(tamperedPayload)).toString('base64url')}.${record.code.split('.')[2]}`;
-  const wrongMessageSignature = `PA1.${encoded}.${sign(null, Buffer.from(`PA1.${encoded}`), privateKey).toString('base64url')}`;
+  const tampered = `GL1.${Buffer.from(JSON.stringify(tamperedPayload)).toString('base64url')}.${signature}`;
+  const unprefixedSignature = `GL1.${encoded}.${sign(null, Buffer.from(encoded, 'base64url'), privateKey).toString('base64url')}`;
   const result = spawnSync(process.env.PYTHON || 'python', [fileURLToPath(new URL('./verify.py', import.meta.url))], {
-    input: JSON.stringify({ code: record.code, publicKey: publicKeyFor(privateKey), machine, tampered, wrongMessageSignature }), encoding: 'utf8', timeout: 15000,
+    input: JSON.stringify({ code: license, publicKey: publicKeyFor(privateKey), machine, product: 'wallpaper', tampered, unprefixedSignature }), encoding: 'utf8', timeout: 15000,
   });
   assert.equal(result.status, 0, result.error?.message || result.stderr);
   const payload = JSON.parse(result.stdout);
-  assert.deepEqual(Object.keys(payload), ['licenseId', 'machineFingerprint', 'edition', 'issuedAt']);
-  assert.equal(payload.licenseId, record.licenseId);
-  assert.ok(Math.abs(payload.issuedAt - Date.now()) < 20000);
+  assert.deepEqual(Object.keys(payload), ['version', 'licenseId', 'cardId', 'productId', 'machineFingerprint', 'edition', 'issuedAt']);
+  assert.equal(payload.cardId, card.cardId);
 });
 
 test('startup rejects absent SQLite administrator and unsafe remote HTTP', () => {
@@ -165,8 +166,6 @@ test('startup rejects absent SQLite administrator and unsafe remote HTTP', () =>
   assert.throws(() => configFromEnv({ PUBLIC_ORIGIN: 'http://example.com' }), /HTTPS/);
   assert.throws(() => configFromEnv({ HOST: '0.0.0.0' }), /HTTPS/);
   assert.throws(() => configFromEnv({ ADMIN_PASSWORD_HASH: passwordHash }), /PRIVATE_KEY_PATH/);
-  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine.toUpperCase(), edition: 'standard' }, ['standard']), /机器码/);
-  assert.throws(() => issueLicense(privateKey, { machineFingerprint: machine, edition: '' }, ['standard']), /授权版本/);
   assert.throws(() => publicKeyFor(generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey), /Ed25519/);
   assert.throws(() => assertMatchingKey(privateKey, CLIENT_PUBLIC_KEY), /does not match/);
   assert.equal(assertMatchingKey(privateKey, publicKeyFor(privateKey)), privateKey);
@@ -287,8 +286,9 @@ test('legacy schema migration preserves licenses and throttles, revokes unowned 
 
 test('authentication, headers, CSRF, session rotation, expiry and logout', async t => {
   const f = await fixture(t);
+  assert.equal((await f.request('/api/cards')).status, 401);
+  assert.equal((await f.request('/api/cards', 'POST', {})).status, 401);
   assert.equal((await f.request('/api/licenses')).status, 401);
-  assert.equal((await f.request('/api/licenses', 'POST', {})).status, 401);
   assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password }, { Origin: 'https://attacker.example' })).status, 403);
   assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password }, { Origin: '' })).status, 403);
   assert.equal((await f.request('/api/login', 'POST', { username: 'test-admin', password: randomBytes(32).toString('hex') })).status, 401);
@@ -299,7 +299,8 @@ test('authentication, headers, CSRF, session rotation, expiry and logout', async
   assert.equal(page.status, 200); assert.match(page.body, /name="viewport"/);
   assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);
   assert.equal(page.headers.get('cache-control'), 'no-store');
-  assert.equal((await f.request('/api/licenses', 'POST', {}, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request('/api/cards', 'POST', {}, { 'X-CSRF-Token': '' })).status, 403);
+  assert.equal((await f.request('/api/licenses')).status, 404);
   assert.equal((await f.request('/api/logout', 'POST', {}, { Origin: 'null' })).status, 403);
   // Fetch rewrites Host. Use the raw HTTP client to exercise the actual Host defense.
   const hostStatus = await new Promise((resolve, reject) => {
@@ -407,10 +408,8 @@ test('temporary administrator can only update account until password is changed'
   updateAdministrator(db, { passwordHash: await hashPassword(password), mustChangePassword: true });
   db.close();
   await f.login();
-  assert.equal((await f.request('/api/licenses')).status, 403);
   assert.equal((await f.request('/api/cards')).status, 403);
   assert.equal((await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard' })).status, 403);
-  assert.equal((await f.request('/api/licenses', 'POST', { machineFingerprint: machine, edition: 'standard' })).status, 403);
   assert.equal((await f.request('/api/account', 'PATCH', { currentPassword: password, username: 'test-admin' })).status, 400);
   assert.equal((await f.request('/api/account', 'PATCH', { currentPassword: password, newPassword: password })).status, 400);
   const nextPassword = randomBytes(32).toString('base64url');
@@ -418,41 +417,38 @@ test('temporary administrator can only update account until password is changed'
   const login = await f.request('/api/login', 'POST', { username: 'test-admin', password: nextPassword });
   assert.equal(login.status, 200);
   const loginCookie = login.headers.get('set-cookie').split(';')[0];
-  assert.equal((await f.request('/api/licenses', 'POST', { machineFingerprint: machine, edition: 'standard' }, { Cookie: loginCookie, 'X-CSRF-Token': login.body.csrf })).status, 201);
+  assert.equal((await f.request('/api/cards', 'POST', { productId: 'photoarchiver', edition: 'standard' }, { Cookie: loginCookie, 'X-CSRF-Token': login.body.csrf })).status, 201);
 });
 
-test('issuance, literal injection search, validation, concurrent persistence and local status', async t => {
+test('literal injection search, request validation, concurrent persistence and static assets', async t => {
   const f = await fixture(t); await f.login();
-  const input = { machineFingerprint: machine, edition: 'standard', note: "<script>alert(1)</script> ' OR 1=1 -- %_" };
-  const issued = await f.request('/api/licenses', 'POST', input);
-  assert.equal(issued.status, 201); assert.match(issued.body.code, /^PA1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{86}$/);
-  const id = issued.body.licenseId;
-  assert.equal((await f.request(`/api/licenses/${id}`)).body.note, input.note);
-  assert.equal((await f.request('/api/licenses?q=' + encodeURIComponent("' OR 1=1 --"))).body.total, 1);
-  assert.equal((await f.request('/api/licenses?q=' + encodeURIComponent("' OR 2=2 --"))).body.total, 0);
-  for (const invalid of [{ ...input, edition: 'unknown' }, { ...input, issuedAt: 1 }, { ...input, note: 'x'.repeat(2001) }, { ...input, machineFingerprint: 'a' }, { ...input, note: 1 }]) {
-    assert.equal((await f.request('/api/licenses', 'POST', invalid)).status, 400);
+  const input = { productId: 'photoarchiver', edition: 'standard', note: "<script>alert(1)</script> ' OR 1=1 -- %_" };
+  const created = await f.request('/api/cards', 'POST', input);
+  assert.equal(created.status, 201);
+  assert.equal((await f.request(`/api/cards/${created.body.cardId}`)).body.note, input.note);
+  assert.equal((await f.request('/api/cards?q=' + encodeURIComponent("' OR 1=1 --"))).body.total, 1);
+  assert.equal((await f.request('/api/cards?q=' + encodeURIComponent("' OR 2=2 --"))).body.total, 0);
+  assert.equal((await f.request('/api/cards?q=' + encodeURIComponent('%_'))).body.total, 1);
+  for (const invalid of [{ ...input, note: 'x'.repeat(2001) }, { ...input, note: 1 }, { ...input, issuedAt: 1 }]) {
+    assert.equal((await f.request('/api/cards', 'POST', invalid)).status, 400);
   }
-  assert.equal((await f.request('/api/licenses', 'POST', { ...input, note: 'x'.repeat(20000) })).status, 413);
-  assert.equal((await f.request('/api/licenses', 'POST', input, { 'Content-Type': 'text/plain' })).status, 415);
-  assert.equal((await f.request('/api/licenses?offset=-1')).status, 400);
-  assert.equal((await f.request('/api/licenses?offset=NaN')).status, 400);
-  const batch = await Promise.all(Array.from({ length: 35 }, (_, n) => f.request('/api/licenses', 'POST', { ...input, note: `Synthetic ${n}` })));
+  assert.equal((await f.request('/api/cards', 'POST', { ...input, note: 'x'.repeat(20000) })).status, 413);
+  assert.equal((await f.request('/api/cards', 'POST', input, { 'Content-Type': 'text/plain' })).status, 415);
+  assert.equal((await f.request('/api/cards?offset=NaN')).status, 400);
+  const batch = await Promise.all(Array.from({ length: 35 }, (_, n) => f.request('/api/cards', 'POST', { ...input, note: `Synthetic ${n}` })));
   assert.ok(batch.every(x => x.status === 201));
-  assert.equal(new Set(batch.map(x => x.body.licenseId)).size, 35);
-  const archived = await f.request(`/api/licenses/${id}`, 'PATCH', { status: 'archived' });
-  assert.equal(archived.body.code, issued.body.code); assert.equal(archived.body.status, 'archived');
-  assert.equal((await f.request(`/api/licenses/${id}`, 'PATCH', { status: 'revoked' })).status, 400);
   await f.restart();
-  const list = await f.request('/api/licenses');
+  const list = await f.request('/api/cards');
   assert.equal(list.body.total, 36); assert.equal(list.body.items.length, 30);
-  assert.equal((await f.request('/api/licenses?offset=30')).body.items.length, 6);
-  assert.equal((await f.request(`/api/licenses/${id}`)).body.code, issued.body.code);
-  assert.equal((await f.request(`/api/licenses/${id}`)).body.status, 'archived');
-  for (const path of ['/.env', '/server.mjs', '/data/issuer.sqlite', '/%2e%2e/lib.mjs']) assert.equal((await f.request(path)).status, 404);
-  for (const path of ['/app.js', '/js/dom.js', '/js/ui.js', '/js/card-drawer.js', '/js/generate.js', '/js/lookup.js', '/js/views/cards.js', '/js/views/overview.js', '/js/views/settings.js']) {
-    const js = (await f.request(path)).body;
-    assert.ok(js.length > 100, path); assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML/.test(js), path); assert.ok(!js.includes('privateKey'), path);
+  assert.equal((await f.request('/api/cards?offset=30')).body.items.length, 6);
+  for (const path of ['/.env', '/server.mjs', '/data/issuer.sqlite', '/%2e%2e/lib.mjs', '/web/src/main.tsx']) assert.equal((await f.request(path)).status, 404);
+  const page = (await f.request('/')).body;
+  const scripts = [...page.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map(m => m[1]);
+  assert.ok(scripts.some(x => x.endsWith('.js')) && scripts.some(x => x.endsWith('.css')), 'built bundle is referenced');
+  for (const path of scripts) {
+    const asset = await f.request(path);
+    assert.equal(asset.status, 200); assert.match(asset.headers.get('cache-control'), /immutable/);
+    assert.ok(!asset.body.includes('PRIVATE KEY'));
   }
 });
 
@@ -554,6 +550,7 @@ test('settings validate products, templates and presets; backup downloads a SQLi
   const f = await fixture(t); await f.login();
   const settings = (await f.request('/api/settings')).body;
   assert.equal(settings.products[0].name, '照片归档');
+  assert.equal(settings.products[1].name, '一池锦鲤'); assert.equal(settings.products[1].color, 'koi');
   assert.equal((await f.request('/api/settings', 'PUT', { products: [{ id: 'unknown', name: 'x', color: 'teal' }] })).status, 400);
   assert.equal((await f.request('/api/settings', 'PUT', { presets: [{ name: 'p', productId: 'wallpaper', edition: 'standard', maxDevices: 0, quantity: 1 }] })).status, 400);
   const saved = await f.request('/api/settings', 'PUT', { products: [{ id: 'wallpaper', name: '动态壁纸', color: 'rose' }], templates: { wallpaper: '码：{cardCode}' },
