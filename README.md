@@ -14,7 +14,7 @@
 ```powershell
 npm install
 npm run build          # 构建管理后台到 dist/（部署或更新前端后都要执行）
-Copy-Item .env.example .env
+New-Item .env           # 内容参考「服务器部署 → 配置 .env」，本地开发保持 HTTP 回环地址即可
 npm run admin:init
 npm start
 ```
@@ -54,7 +54,179 @@ npm run check-key
 
 `npm test` builds the console first (the static-asset test checks the bundle), then runs the suite, including an independent Python GL1 verifier (`pip install -r test/requirements.txt`). It calls `python` by default; on systems that only ship `python3`, run `PYTHON=python3 npm test`.
 
-For HTTPS deployment, put the service behind a reverse proxy and set `PUBLIC_ORIGIN` to the exact HTTPS origin. `Caddyfile.example` contains a sample proxy configuration.
+For HTTPS deployment, put the service behind a reverse proxy and set `PUBLIC_ORIGIN` to the exact HTTPS origin. `Caddyfile.example` contains a sample proxy configuration. 完整步骤见下方「服务器部署」。
+
+## 服务器部署
+
+以下以 Ubuntu 24.04 / Debian 12、域名 `licenses.example.com`、部署目录 `/opt/license-issuer` 为例，结构为：Caddy（80/443，自动 HTTPS）→ Node 服务（仅监听 `127.0.0.1:8787`）。Node 服务不直接对外暴露。
+
+### 1. 准备
+
+- 一台 Linux 服务器，域名 A/AAAA 记录已指向服务器公网 IP。
+- 防火墙 / 云安全组只放行 22、80、443，**不要**放行 8787。
+
+```bash
+sudo ufw allow OpenSSH && sudo ufw allow 80,443/tcp && sudo ufw enable
+```
+
+### 2. 安装 Node.js 24 与 Caddy
+
+服务依赖内置的 `node:sqlite`，要求 Node.js `>=24.15.0 <25`。
+
+```bash
+# Node.js 24（NodeSource）
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt install -y nodejs git
+node -v   # 应为 v24.15.x 或更高的 24.x
+
+# Caddy（官方源）
+sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https curl
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+sudo apt update && sudo apt install -y caddy
+```
+
+### 3. 获取代码并构建
+
+代码目录归部署用户所有，服务以独立的低权限用户运行，只对 `data/` 有写权限。
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin license-issuer
+sudo mkdir -p /opt/license-issuer && sudo chown "$USER" /opt/license-issuer
+git clone <仓库地址> /opt/license-issuer
+cd /opt/license-issuer
+npm ci
+npm run build
+sudo install -d -o license-issuer -g license-issuer -m 700 data
+```
+
+### 4. 放置签名私钥
+
+私钥必须放在仓库之外，且只有服务用户可读。**私钥对应的公钥必须与客户端内置的公钥一致**（默认 `7K3Lua0o-z03ZKplamnmLAwKrG8QmQble1pkwgypUe4`），否则服务拒绝启动。
+
+- 已有私钥：从安全渠道复制到服务器（例如 `scp`），不要经过 Git 或聊天工具。
+- 全新部署：生成新私钥后，需要把打印出的公钥写入 `LICENSE_EXPECTED_PUBLIC_KEY`，**并同步替换各客户端内置的公钥后重新发版**；旧客户端无法验证新私钥签发的许可证。
+
+```bash
+sudo install -d -o root -g license-issuer -m 750 /etc/license-issuer
+# 已有私钥：
+sudo install -o root -g license-issuer -m 640 ./signing.pem /etc/license-issuer/signing.pem
+# 或全新生成（Ed25519 PKCS8 PEM）：
+# sudo openssl genpkey -algorithm ed25519 -out /etc/license-issuer/signing.pem
+# sudo chown root:license-issuer /etc/license-issuer/signing.pem && sudo chmod 640 /etc/license-issuer/signing.pem
+
+# 查看该私钥对应的公钥（43 位 base64url）
+sudo node -e "const c=require('crypto');console.log(c.createPublicKey(require('fs').readFileSync(process.argv[1])).export({format:'jwk'}).x)" /etc/license-issuer/signing.pem
+```
+
+私钥另外离线备份一份。私钥丢失后无法再签发客户端可验证的许可证，后台保存的卡密密文也无法解密。
+
+### 5. 配置 `.env`
+
+在 `/opt/license-issuer/.env` 写入：
+
+```ini
+HOST=127.0.0.1
+PORT=8787
+# 与浏览器地址完全一致：https、无末尾斜杠
+PUBLIC_ORIGIN=https://licenses.example.com
+DATABASE_PATH=./data/issuer.sqlite
+LICENSE_PRIVATE_KEY_PATH=/etc/license-issuer/signing.pem
+# 私钥加密时填写，否则留空
+LICENSE_PRIVATE_KEY_PASSPHRASE=
+LICENSE_EXPECTED_PUBLIC_KEY=7K3Lua0o-z03ZKplamnmLAwKrG8QmQble1pkwgypUe4
+LICENSE_PRODUCTS=photoarchiver,wallpaper
+LICENSE_EDITIONS=standard
+```
+
+```bash
+sudo chgrp license-issuer .env && chmod 640 .env
+# 校验私钥与公钥是否匹配
+sudo -u license-issuer node --env-file=.env admin.mjs check-key
+```
+
+### 6. 配置 systemd 服务
+
+创建 `/etc/systemd/system/license-issuer.service`：
+
+```ini
+[Unit]
+Description=License Issuer
+After=network.target
+
+[Service]
+Type=simple
+User=license-issuer
+Group=license-issuer
+WorkingDirectory=/opt/license-issuer
+ExecStart=/usr/bin/node --env-file=/opt/license-issuer/.env server.mjs
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/license-issuer/data
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now license-issuer
+sudo systemctl status license-issuer
+journalctl -u license-issuer -f   # 应看到 "License issuer listening on 127.0.0.1:8787; public origin https://..."
+```
+
+首次启动时管理员表为空，会自动创建默认账号 `admin` / `admin123`。
+
+### 7. 配置 Caddy 反向代理
+
+把 `Caddyfile.example` 的内容写入 `/etc/caddy/Caddyfile`，域名改成实际域名（必须与 `PUBLIC_ORIGIN` 一致），然后：
+
+```bash
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
+```
+
+Caddy 会自动申请并续期 HTTPS 证书。服务会校验 `Host` 头必须等于 `PUBLIC_ORIGIN` 的主机名，否则返回 403；若改用 Nginx，需要 `proxy_pass http://127.0.0.1:8787;`、`proxy_set_header Host $host;`，并用 `client_max_body_size 16k;` 限制请求体。
+
+### 8. 上线验证
+
+1. 浏览器打开 `https://licenses.example.com`，用 `admin` / `admin123` 登录，按提示**立即修改密码**。
+2. 在「设置」页确认签名公钥与客户端内置公钥一致。
+3. 用一张不存在的卡密验证激活接口可达，预期返回 404 `card_not_found`：
+
+```bash
+curl -s https://licenses.example.com/api/v1/activate \
+  -H 'Content-Type: application/json' \
+  -d '{"cardCode":"LIC-AAAAAAAA-AAAAAAAA-AAAAAAAA-AAAAAAAA-AAAAAAAA","productId":"photoarchiver","machineFingerprint":"sha256:0000000000000000000000000000000000000000000000000000000000000000"}'
+```
+
+4. 生成一张测试卡，用真实客户端激活一次，确认能离线验签通过，再在后台删除或停用。
+
+### 9. 更新版本
+
+```bash
+cd /opt/license-issuer
+# 先在「设置」页下载数据库备份，或：
+sudo cp data/issuer.sqlite ~/issuer-$(date +%F).sqlite
+git pull
+npm ci
+npm run build
+sudo systemctl restart license-issuer
+```
+
+服务启动时读取 `dist/` 快照，构建后必须重启。数据库只做增量迁移，不改写已有卡密和激活记录。
+
+### 10. 运维
+
+- **备份**：定期在「设置」页下载备份（`VACUUM INTO` 一致性快照），或在服务器上用 cron 调用 `sqlite3 data/issuer.sqlite ".backup /backup/issuer.sqlite"`。备份文件含卡密密文，与私钥分开存放。
+- **忘记密码 / 改用户名**：`cd /opt/license-issuer && sudo -u license-issuer node --env-file=.env admin.mjs reset-password`（或 `rename`）。
+- **日志**：`journalctl -u license-issuer`；激活记录与操作日志在后台「日志」页查看。
+- **限流**：经过反向代理后，所有激活请求共享代理地址的每分钟 60 次额度。客户量大时可在 Caddy / Nginx 层按真实客户端 IP 另行限流。
 
 ## 管理后台
 
