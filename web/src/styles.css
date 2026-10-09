@@ -27,6 +27,11 @@
   --shadow-xs: 0 1px 2px rgb(12 12 16 / 4%);
   --shadow-sm: 0 1px 2px rgb(12 12 16 / 4%), 0 2px 6px -2px rgb(12 12 16 / 6%);
   --shadow-lg: 0 20px 44px -12px rgb(12 12 16 / 22%), 0 6px 16px -8px rgb(12 12 16 / 10%);
+  /* Sign-in illustration palette (derived from the accent). */
+  --ill-bg: color-mix(in oklab, var(--accent) 7%, white); --ill-blob: color-mix(in oklab, var(--accent) 13%, white);
+  --ill-mint: color-mix(in oklab, var(--accent) 22%, white); --ill-paper: #ffffff; --ill-gray: #eef1f0; --ill-gray-2: #dfe4e2;
+  --ill-line: #d3dcd9; --ill-ink: #16191b; --ill-ink-2: #3a4245; --ill-warm: #f2b84b; --ill-shadow: rgb(12 30 26 / 7%);
+  --ill-jade: var(--accent); --ill-jade-hi: color-mix(in oklab, var(--accent) 60%, white); --ill-jade-lo: color-mix(in oklab, var(--accent) 65%, black);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -41,6 +46,10 @@
     --st-unused: #14a596; --st-partial: #c4851f; --st-full: #7183f5; --st-disabled: #46474e;
     --side: #0c0c0f; --side-2: #1a1a1f; --side-line: #1f1f24; --side-fg: #eeeef0; --side-muted: #7c7c87;
     --ink: #060608; --ink-2: #121216; --ink-line: #1f1f24;
+    --ill-bg: color-mix(in oklab, var(--accent) 9%, #0b0d0e); --ill-blob: color-mix(in oklab, var(--accent) 16%, #0f1213);
+    --ill-mint: color-mix(in oklab, var(--accent) 30%, #111516); --ill-paper: #1d2426; --ill-gray: #262e30; --ill-gray-2: #303a3c;
+    --ill-line: #3a4648; --ill-ink: #2f3739; --ill-ink-2: #8a979a; --ill-shadow: rgb(0 0 0 / 35%);
+    --ill-jade: color-mix(in oklab, var(--accent) 88%, white);
     --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 20px 44px -12px rgb(0 0 0 / 70%);
   }
 }
@@ -56,6 +65,10 @@
   --st-unused: #14a596; --st-partial: #c4851f; --st-full: #7183f5; --st-disabled: #46474e;
   --side: #0c0c0f; --side-2: #1a1a1f; --side-line: #1f1f24; --side-fg: #eeeef0; --side-muted: #7c7c87;
   --ink: #060608; --ink-2: #121216; --ink-line: #1f1f24;
+  --ill-bg: color-mix(in oklab, var(--accent) 9%, #0b0d0e); --ill-blob: color-mix(in oklab, var(--accent) 16%, #0f1213);
+  --ill-mint: color-mix(in oklab, var(--accent) 30%, #111516); --ill-paper: #1d2426; --ill-gray: #262e30; --ill-gray-2: #303a3c;
+  --ill-line: #3a4648; --ill-ink: #2f3739; --ill-ink-2: #8a979a; --ill-shadow: rgb(0 0 0 / 35%);
+  --ill-jade: color-mix(in oklab, var(--accent) 88%, white);
   --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 20px 44px -12px rgb(0 0 0 / 70%);
 }
 :root {
@@ -103,26 +116,24 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Sign-in network art: a faint grid fading out from the centre of the ink panel. */
-  .net-grid {
-    background-image: linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: radial-gradient(60% 55% at 50% 48%, black, transparent);
-  }
-  .net-spin { animation: net-spin 80s linear infinite; }
-  .net-spin-rev { animation-duration: 120s; animation-direction: reverse; }
-  .net-pulse { stroke-dasharray: 18 420; animation: net-travel 3.2s cubic-bezier(.5, 0, .5, 1) infinite; }
-  .net-ripple { transform-box: fill-box; transform-origin: center; animation: net-ripple 3.2s ease-out infinite; }
-  .net-blink { animation: net-blink 3.2s ease-in-out infinite; }
+  /* Sign-in illustration motion: slow floats, a swaying plant, twinkling sparkles, a flowing issuance link. */
+  .ill-float { animation: ill-float 6s ease-in-out infinite; }
+  .ill-float-tilt { transform-box: fill-box; transform-origin: center; animation: ill-float-tilt 7s ease-in-out infinite; }
+  .ill-sway { transform-box: fill-box; transform-origin: 50% 100%; animation: ill-sway 5s ease-in-out infinite; }
+  .ill-twinkle { transform-box: fill-box; transform-origin: center; animation: ill-twinkle 3.2s ease-in-out infinite; }
+  .ill-flow { animation: ill-flow 1.6s linear infinite; }
+  .ill-draw { stroke-dasharray: 260; animation: ill-draw 1.6s cubic-bezier(.2, .8, .2, 1) .4s both; }
   .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
   .tabular, .font-display { font-feature-settings: "tnum", "cv11"; }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }
-@keyframes net-spin { to { transform: rotate(360deg); } }
-@keyframes net-travel { from { stroke-dashoffset: 0; opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } to { stroke-dashoffset: -400; opacity: 0; } }
-@keyframes net-ripple { from { transform: scale(1); opacity: .55; } to { transform: scale(1.9); opacity: 0; } }
-@keyframes net-blink { 0%, 70% { opacity: .35; } 85% { opacity: 1; } 100% { opacity: .35; } }
+@keyframes ill-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes ill-float-tilt { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-7px) rotate(-4deg); } }
+@keyframes ill-sway { 0%, 100% { transform: rotate(-2.5deg); } 50% { transform: rotate(2.5deg); } }
+@keyframes ill-twinkle { 0%, 100% { opacity: .35; transform: scale(.75); } 50% { opacity: 1; transform: scale(1); } }
+@keyframes ill-flow { to { stroke-dashoffset: -18; } }
+@keyframes ill-draw { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes leave { to { opacity: 0; transform: translateY(-8px) scale(.98); filter: blur(4px); } }
 @keyframes sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(220%) skewX(-20deg); } }
