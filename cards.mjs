@@ -299,10 +299,11 @@ export function cardSummary(db, config = {}, now = Date.now(), tzOffset = 0) {
     FROM cards`).get();
   const counts = new Map(db.prepare(`WITH u AS (SELECT c.productId, c.status, c.maxDevices, ${used} AS used FROM cards c)
     SELECT productId, count(*) AS total, sum(status='disabled') AS disabled, sum(status='active' AND used=0) AS unused,
-      sum(status='active' AND used>0 AND used<maxDevices) AS partial, sum(status='active' AND used>=maxDevices) AS full, sum(used) AS activations
+      sum(status='active' AND used>0 AND used<maxDevices) AS partial, sum(status='active' AND used>=maxDevices) AS full, sum(used) AS activations,
+      sum(CASE WHEN status='active' THEN maxDevices ELSE 0 END) AS capacity
     FROM u GROUP BY productId`).all().map(row => [row.productId, row]));
   const productIds = [...new Set([...products(config), ...counts.keys()])];
-  const productStats = productIds.map(productId => Object.fromEntries(['total', 'unused', 'partial', 'full', 'disabled', 'activations']
+  const productStats = productIds.map(productId => Object.fromEntries(['total', 'unused', 'partial', 'full', 'disabled', 'activations', 'capacity']
     .map(key => [key, Number(counts.get(productId)?.[key] || 0)]).concat([['productId', productId]])));
   // Day buckets follow the viewer's time zone; tzOffset is Date#getTimezoneOffset() in minutes.
   const shift = tzOffset * 60000;
@@ -315,8 +316,11 @@ export function cardSummary(db, config = {}, now = Date.now(), tzOffset = 0) {
     const row = byDay.get(day) || {};
     return { date: new Date(day * 86400000).toISOString().slice(0, 10), activated: Number(row.activated || 0), renewed: Number(row.renewed || 0), failed: Number(row.failed || 0) };
   });
+  // Request outcomes over the same 30-day window, for the success rate and failure breakdown.
+  const outcomes = Object.fromEntries(db.prepare('SELECT result, count(*) AS n FROM activation_log WHERE at >= ? GROUP BY result')
+    .all((today - 29) * 86400000 + shift).map(row => [row.result, Number(row.n)]));
   const recent = db.prepare(`SELECT cardId, productId, edition, issuedAt, status, note, ${used} AS usedDevices FROM cards c ORDER BY issuedAt DESC, cardId LIMIT 5`).all();
-  return { totals: Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Number(value || 0)])), products: productStats, trend, recent };
+  return { totals: Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Number(value || 0)])), products: productStats, trend, outcomes, recent };
 }
 
 export function allowActivation(db, address, now) {

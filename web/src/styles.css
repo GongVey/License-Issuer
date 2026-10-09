@@ -1,7 +1,5 @@
 @import "tailwindcss";
 @import "@fontsource-variable/inter/wght.css";
-@import "@fontsource-variable/fraunces/opsz.css";
-@import "@fontsource-variable/fraunces/opsz-italic.css";
 
 /*
  * Design tokens. Components only reference these semantic names.
@@ -11,61 +9,61 @@
  */
 :root {
   color-scheme: light;
-  --accent: #b8432f;
-  /* 纸 · paper canvas and ink text */
-  --bg: #f4f2ec; --surface: #fbfaf6; --surface-2: #efece4; --surface-3: #e4e0d5; --hover: #eeebe3;
-  --line: #e2ded3; --line-strong: #cfc9bb;
-  --fg: #1c1a16; --fg-2: #4f4b43; --muted: #8a8578;
+  --accent: #4f46e5;
+  --bg: #f4f5f9; --surface: #ffffff; --surface-2: #f0f2f7; --surface-3: #e3e6ee; --hover: #f2f4f8;
+  --line: #e3e6ed; --line-strong: #d0d4de;
+  --fg: #12142a; --fg-2: #474c63; --muted: #777d95;
   --primary: var(--accent);
-  --ok: #2f7a4f; --ok-soft: #e4efe3; --warn: #a2580c; --warn-soft: #f6ead6; --danger: #b8322a; --danger-soft: #f6e3df;
-  --info: #2c5f9e; --info-soft: #e3eaf3; --neutral-soft: #ebe8e0;
-  --chart-ok: #2f6fd6; --chart-fail: #d9532b;
-  --st-unused: #2f6fd6; --st-partial: #c8681c; --st-full: #16835f; --st-disabled: #aaa496;
-  /* 墨 · ink sidebar (dark in both themes) */
-  --ink: #1a1813; --ink-2: #24211b; --ink-line: #322e26; --ink-fg: #ece7da; --ink-muted: #8f897b;
-  --shadow-xs: 0 1px 2px rgb(40 32 16 / 6%);
-  --shadow-sm: 0 1px 3px rgb(40 32 16 / 8%), 0 1px 2px rgb(40 32 16 / 5%);
-  --shadow-lg: 0 28px 56px -16px rgb(40 32 16 / 28%), 0 8px 20px -10px rgb(40 32 16 / 14%);
+  --ok: #1a7f4e; --ok-soft: #e3f4ea; --warn: #a15c07; --warn-soft: #fbf0dc; --danger: #c93636; --danger-soft: #fbe6e6;
+  --info: #2a63c4; --info-soft: #e5eefc; --neutral-soft: #eceef4;
+  /* Chart series (validated for CVD and contrast; text never wears these). */
+  --chart-ok: #2a78d6; --chart-fail: #eb6834; --chart-track: #e8ebf2;
+  --st-unused: #2a78d6; --st-partial: #eda100; --st-full: #1baf7a; --st-disabled: #b3b8c7;
+  /* Navy sidebar (dark in both themes) */
+  --ink: #111427; --ink-2: #1c2038; --ink-line: #272c48; --ink-fg: #e8eaf4; --ink-muted: #8a90ad;
+  --shadow-xs: 0 1px 2px rgb(18 20 42 / 5%);
+  --shadow-sm: 0 1px 3px rgb(18 20 42 / 7%), 0 1px 2px rgb(18 20 42 / 4%);
+  --shadow-lg: 0 24px 48px -16px rgb(18 20 42 / 24%), 0 8px 20px -10px rgb(18 20 42 / 12%);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #12110e; --surface: #191814; --surface-2: #211f1a; --surface-3: #2c2a23; --hover: #1f1d18;
-    --line: #2b2923; --line-strong: #3b3830;
-    --fg: #ece7dc; --fg-2: #bfb9ab; --muted: #8b8577;
-    --primary: color-mix(in oklab, var(--accent) 78%, white);
-    --ok: #6cc08f; --ok-soft: #16261b; --warn: #e3a453; --warn-soft: #2c210f; --danger: #f07a68; --danger-soft: #2f1915;
-    --info: #86b1ea; --info-soft: #172334; --neutral-soft: #24221c;
-    --chart-ok: #4a86e8; --chart-fail: #e0603a;
-    --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5b51;
-    --ink: #0c0b09; --ink-2: #171510; --ink-line: #24221c;
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 28px 56px -16px rgb(0 0 0 / 75%);
+    --bg: #0b0d18; --surface: #131628; --surface-2: #1a1e33; --surface-3: #252a42; --hover: #191c30;
+    --line: #22263c; --line-strong: #32374f;
+    --fg: #e9ebf5; --fg-2: #b3b8cc; --muted: #7f859e;
+    --primary: color-mix(in oklab, var(--accent) 86%, white);
+    --ok: #4fc68a; --ok-soft: #11281e; --warn: #e8ac4c; --warn-soft: #2b2110; --danger: #f07474; --danger-soft: #311619;
+    --info: #7eaaf2; --info-soft: #14213b; --neutral-soft: #1d2135;
+    --chart-ok: #3987e5; --chart-fail: #d95926; --chart-track: #22263c;
+    --st-unused: #3987e5; --st-partial: #c98500; --st-full: #199e70; --st-disabled: #4a4f68;
+    --ink: #080a14; --ink-2: #141729; --ink-line: #1f2338;
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 70%);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #12110e; --surface: #191814; --surface-2: #211f1a; --surface-3: #2c2a23; --hover: #1f1d18;
-  --line: #2b2923; --line-strong: #3b3830;
-  --fg: #ece7dc; --fg-2: #bfb9ab; --muted: #8b8577;
-  --primary: color-mix(in oklab, var(--accent) 78%, white);
-  --ok: #6cc08f; --ok-soft: #16261b; --warn: #e3a453; --warn-soft: #2c210f; --danger: #f07a68; --danger-soft: #2f1915;
-  --info: #86b1ea; --info-soft: #172334; --neutral-soft: #24221c;
-  --chart-ok: #4a86e8; --chart-fail: #e0603a;
-  --st-unused: #4a86e8; --st-partial: #d0702e; --st-full: #2a9d74; --st-disabled: #5f5b51;
-  --ink: #0c0b09; --ink-2: #171510; --ink-line: #24221c;
-  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 28px 56px -16px rgb(0 0 0 / 75%);
+  --bg: #0b0d18; --surface: #131628; --surface-2: #1a1e33; --surface-3: #252a42; --hover: #191c30;
+  --line: #22263c; --line-strong: #32374f;
+  --fg: #e9ebf5; --fg-2: #b3b8cc; --muted: #7f859e;
+  --primary: color-mix(in oklab, var(--accent) 86%, white);
+  --ok: #4fc68a; --ok-soft: #11281e; --warn: #e8ac4c; --warn-soft: #2b2110; --danger: #f07474; --danger-soft: #311619;
+  --info: #7eaaf2; --info-soft: #14213b; --neutral-soft: #1d2135;
+  --chart-ok: #3987e5; --chart-fail: #d95926; --chart-track: #22263c;
+  --st-unused: #3987e5; --st-partial: #c98500; --st-full: #199e70; --st-disabled: #4a4f68;
+  --ink: #080a14; --ink-2: #141729; --ink-line: #1f2338;
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 70%);
 }
 :root {
   --primary-hover: color-mix(in oklab, var(--primary) 88%, black);
-  --primary-soft: color-mix(in oklab, var(--primary) 10%, var(--surface));
+  --primary-soft: color-mix(in oklab, var(--primary) 11%, var(--surface));
   --primary-strong: color-mix(in oklab, var(--primary) 82%, var(--fg));
   --on-primary: #ffffff;
 }
 
 @theme inline {
   --font-sans: "Inter Variable", system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
-  /* Display: Fraunces for Latin and numerals; CJK falls back to a system serif where one exists, else the UI sans. */
-  --font-display: "Fraunces Variable", "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "Noto Serif SC", "PingFang SC", "Microsoft YaHei", serif;
+  /* Display: the UI sans at heavier weights with tighter tracking. */
+  --font-display: "Inter Variable", system-ui, -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --color-bg: var(--bg); --color-surface: var(--surface); --color-surface-2: var(--surface-2); --color-surface-3: var(--surface-3); --color-hover: var(--hover);
   --color-line: var(--line); --color-line-strong: var(--line-strong);
@@ -73,7 +71,7 @@
   --color-primary: var(--primary); --color-primary-hover: var(--primary-hover); --color-primary-soft: var(--primary-soft); --color-primary-strong: var(--primary-strong); --color-on-primary: var(--on-primary);
   --color-ok: var(--ok); --color-ok-soft: var(--ok-soft); --color-warn: var(--warn); --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger); --color-danger-soft: var(--danger-soft); --color-info: var(--info); --color-info-soft: var(--info-soft); --color-neutral-soft: var(--neutral-soft);
-  --color-chart-ok: var(--chart-ok); --color-chart-fail: var(--chart-fail);
+  --color-chart-ok: var(--chart-ok); --color-chart-fail: var(--chart-fail); --color-chart-track: var(--chart-track);
   --color-st-unused: var(--st-unused); --color-st-partial: var(--st-partial); --color-st-full: var(--st-full); --color-st-disabled: var(--st-disabled);
   --color-product: var(--product, #64748b);
   --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-ink-line: var(--ink-line); --color-ink-fg: var(--ink-fg); --color-ink-muted: var(--ink-muted);
@@ -99,23 +97,21 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Sign-in brand panel: accent-tinted mesh over a fine grid, all derived from --accent. */
-  /* Sign-in panel: ink ground, a soft seal-red glow and paper grain, all derived from --accent. */
+  /* Sign-in panel: deep navy lit by two soft accent glows, with a dot grid that fades out toward the edges. */
   .brand-panel {
     background-color: var(--ink);
     background-image:
-      radial-gradient(70% 55% at 85% 100%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
-      radial-gradient(45% 40% at 10% 0%, color-mix(in oklab, var(--accent) 22%, transparent), transparent 70%);
+      radial-gradient(60% 50% at 100% 0%, color-mix(in oklab, var(--accent) 45%, transparent), transparent 70%),
+      radial-gradient(55% 45% at 0% 100%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%);
   }
-  /* Fine ruled lines, like letter paper. */
   .brand-grid {
-    background-image: linear-gradient(rgb(255 255 255 / 5%) 1px, transparent 1px);
-    background-size: 100% 28px;
-    mask-image: linear-gradient(180deg, transparent, black 30%, black 70%, transparent);
+    background-image: radial-gradient(rgb(255 255 255 / 9%) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: radial-gradient(70% 60% at 50% 45%, black, transparent);
   }
-  .font-display { font-family: var(--font-display); font-optical-sizing: auto; letter-spacing: -0.01em; }
-  /* Hairline rules that fade at both ends, used between editorial sections instead of boxes. */
-  .rule { height: 1px; background: linear-gradient(90deg, var(--line-strong), var(--line) 40%, transparent); }
+  /* Frosted card on the dark panel. */
+  .glass { background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); backdrop-filter: blur(12px); }
+  .font-display { font-family: var(--font-display); letter-spacing: -0.022em; }
 }
 
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }

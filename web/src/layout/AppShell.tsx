@@ -20,13 +20,13 @@ export const NAV = [
 // Phone tab bar: four destinations around a central "generate" action; batches live under the cards tab.
 const TABS = [NAV[0], NAV[1], null, NAV[3], { path: '/settings', label: '设置', icon: Settings }];
 
-// Ink sidebar item: the active entry gets a seal-red rule on its left edge.
+// Sidebar item: the active entry is lifted and marked with an accent bar on its left edge.
 function InkItem({ to, active, icon, children, trailing }: { to: string; active: boolean; icon: ReactNode; children: ReactNode; trailing?: ReactNode }) {
   return (
     <a href={to} aria-current={active ? 'page' : undefined}
-      className={cn('group relative flex h-9 items-center gap-3 rounded-md px-3 text-[13px] font-medium text-ink-fg/70 transition-colors hover:bg-ink-2 hover:text-ink-fg',
-        active && 'bg-ink-2 text-ink-fg')}>
-      {active && <span className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-primary" aria-hidden />}
+      className={cn('group relative flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-ink-fg/70 transition-colors hover:bg-ink-2 hover:text-ink-fg',
+        active && 'bg-[color-mix(in_oklab,var(--accent)_22%,var(--ink-2))] text-ink-fg')}>
+      {active && <span className="absolute inset-y-2 -left-3 w-[3px] rounded-r-full bg-[color-mix(in_oklab,var(--accent)_70%,white)]" aria-hidden />}
       <span className={cn('grid size-4 place-items-center text-ink-muted group-hover:text-ink-fg/80 [&>svg]:size-4', active && 'text-ink-fg')}>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {trailing}
@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-dvh md:grid md:grid-cols-[256px_minmax(0,1fr)]">
-      {/* 墨 · desktop sidebar */}
+      {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh flex-col bg-ink text-ink-fg md:flex">
         <a href="#/overview" className="flex items-center gap-3 px-5 pt-6 pb-6">
           <BrandMark name={brand.name} className="size-9 text-base" />
@@ -81,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </a>
         <div className="px-3 pb-5">
           <button type="button" onClick={() => openLookup()}
-            className="flex h-9 w-full items-center gap-2.5 rounded-md border border-ink-line bg-ink-2/60 px-3 text-[13px] text-ink-muted transition-colors hover:border-ink-fg/20 hover:text-ink-fg/80">
+            className="flex h-9 w-full items-center gap-2.5 rounded-lg border border-ink-line bg-ink-2/60 px-3 text-[13px] text-ink-muted transition-colors hover:border-ink-fg/20 hover:text-ink-fg/80">
             <Search className="size-4 shrink-0" /><span className="flex-1 text-left">搜索卡密、机器码…</span>
             <kbd className="font-sans text-[11px] text-ink-muted/80">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
           </button>
@@ -106,12 +106,12 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <div className="grid gap-1 px-3 pt-3 pb-4">
           <button type="button" onClick={() => openGenerate()}
-            className="mb-2 flex h-10 items-center justify-center gap-2 rounded-md bg-primary text-[13px] font-semibold text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] transition-colors hover:bg-primary-hover">
+            className="mb-2 flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-[13px] font-semibold text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] transition-colors hover:bg-primary-hover">
             <Plus className="size-4" />生成卡密<kbd className="ml-1 rounded bg-black/15 px-1.5 font-sans text-[11px] font-medium">N</kbd>
           </button>
           <InkItem to="#/settings" active={path === '/settings'} icon={<Settings />}>设置</InkItem>
           <div className="mt-2 flex items-center gap-2.5 border-t border-ink-line px-1 pt-3">
-            <span className="grid size-8 place-items-center rounded-full bg-ink-2 font-display text-sm font-semibold uppercase text-ink-fg ring-1 ring-ink-line">{session.username.slice(0, 1)}</span>
+            <span className="grid size-8 place-items-center rounded-full bg-[color-mix(in_oklab,var(--accent)_35%,var(--ink-2))] text-sm font-semibold uppercase text-ink-fg ring-1 ring-white/10">{session.username.slice(0, 1)}</span>
             <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{session.username}</span><span className="block text-[11px] text-ink-muted">管理员</span></span>
             <IconButton label={dark ? '切换到浅色' : '切换到深色'} size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
             <IconButton label="退出登录" size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={logout}><LogOut /></IconButton>

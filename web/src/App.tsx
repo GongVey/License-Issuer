@@ -49,7 +49,7 @@ function ForcePassword() {
   const branding = { ...settings.branding, products: settings.branding.showProducts ? settings.products : [] };
   return (
     <AuthLayout branding={branding}>
-      <h1 className="font-display text-[32px] leading-tight font-semibold">设置新密码</h1>
+      <h1 className="font-display text-[28px] leading-tight font-bold">设置新密码</h1>
       <p className="mt-1.5 mb-8 text-sm text-muted">账号 {session.username} 正在使用初始密码，设置新密码后需要重新登录。</p>
       <AccountForm forced />
       <Button variant="ghost" className="mt-3 w-full" onClick={async () => { try { await api('/api/logout', 'POST', {}); } catch { /* ignore */ } signOut(); }}>退出登录</Button>
