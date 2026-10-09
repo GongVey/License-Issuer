@@ -103,32 +103,33 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Ticker rows on the sign-in brand panel fade out toward both edges. */
-  .ticker-mask { mask-image: linear-gradient(90deg, transparent, black 18%, black 82%, transparent); }
-  /* Sign-in form side: one soft accent light, drifting slowly. */
-  .auth-light {
-    background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 13%, transparent), transparent);
-    transform: translate(-50%, -50%);
-    animation: light-drift 14s ease-in-out infinite alternate;
+  /* Sign-in ink panel lights: soft accent glows that drift slowly. Resting position is set without animation,
+     so reduced motion leaves them in place. */
+  .ink-light { position: absolute; pointer-events: none; border-radius: 9999px; }
+  .ink-light-a {
+    width: 90%; aspect-ratio: 1; right: -30%; bottom: -45%;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 60%, transparent), transparent);
+    animation: ink-drift-a 16s ease-in-out infinite alternate;
   }
-  .vertical-text { writing-mode: vertical-rl; text-orientation: upright; }
+  .ink-light-b {
+    width: 60%; aspect-ratio: 1; left: -20%; top: -25%;
+    background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 22%, transparent), transparent);
+    animation: ink-drift-b 20s ease-in-out infinite alternate;
+  }
   .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
   .tabular, .font-display { font-feature-settings: "tnum", "cv11"; }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }
-@keyframes marquee { to { transform: translateX(-50%); } }
-@keyframes seal-in { 0% { opacity: 0; transform: scale(1.35) rotate(-8deg); } 60% { opacity: 1; transform: scale(.96) rotate(1deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
-@keyframes ripple { 0% { opacity: .7; transform: scale(1); } 100% { opacity: 0; transform: scale(1.9); } }
-@keyframes breathe { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 0%, transparent), 0 30px 80px -20px color-mix(in oklab, var(--accent) 55%, transparent); } 50% { box-shadow: 0 0 0 0 transparent, 0 30px 100px -10px color-mix(in oklab, var(--accent) 75%, transparent); } }
-@keyframes caret { 50% { opacity: 0; } }
-@keyframes light-drift { from { transform: translate(-70%, -65%) scale(.9); } to { transform: translate(-30%, -35%) scale(1.15); } }
+@keyframes ink-drift-a { to { transform: translate(-18%, -14%) scale(1.12); } }
+@keyframes ink-drift-b { to { transform: translate(22%, 16%) scale(.9); } }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes leave { to { opacity: 0; transform: translateY(-8px) scale(.98); filter: blur(4px); } }
+@keyframes sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(220%) skewX(-20deg); } }
 /* Staggered entrance: set --i on each element to order it. */
 @utility anim-rise { animation: rise .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 70ms + 80ms); }
-@utility anim-marquee { animation: marquee var(--speed, 60s) linear infinite; animation-direction: var(--dir, normal); }
-@utility anim-seal { animation: seal-in .9s cubic-bezier(.2, .8, .2, 1) .25s both, breathe 6s ease-in-out 1.2s infinite; }
-@utility anim-ripple { animation: ripple 1.3s cubic-bezier(.2, .8, .2, 1) .75s both; }
-@utility anim-caret { animation: caret 1s steps(1) infinite; }
+@utility anim-shake { animation: shake .4s ease-in-out; }
+@utility anim-leave { animation: leave .35s ease-in forwards; }
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }
 @keyframes sheet-left { from { transform: translateX(24px); opacity: 0; } }
 @keyframes pop { from { transform: translateY(4px) scale(.985); opacity: 0; } }
