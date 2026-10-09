@@ -102,7 +102,7 @@ function BrandPanel({ name, tagline, products }: { name: string; tagline: string
 function CompactBrand({ name, tagline }: { name: string; tagline: string }) {
   const glyph = Array.from(name.trim())[0]?.toUpperCase() || '·';
   return (
-    <div className="anim-rise relative mb-9 overflow-hidden rounded-2xl bg-ink text-ink-fg lg:hidden" style={step(0)}>
+    <div className="relative mb-9 overflow-hidden rounded-2xl bg-ink text-ink-fg lg:hidden">
       <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_80%_at_15%_30%,color-mix(in_oklab,var(--accent)_30%,transparent),transparent_70%)]" />
       <div className="relative flex items-center gap-4 p-5">
         <div className="anim-seal relative grid size-14 shrink-0 place-items-center rounded-[14px] bg-[linear-gradient(145deg,color-mix(in_oklab,var(--accent)_88%,white),var(--accent)_55%,color-mix(in_oklab,var(--accent)_75%,black))]">
@@ -120,8 +120,8 @@ function CompactBrand({ name, tagline }: { name: string; tagline: string }) {
 }
 
 // 知白: the white half holds only the form. On phones the brand panel collapses into a small header.
-export function AuthLayout({ branding, title, subtitle, leaving, children }: {
-  branding: PublicBranding | null; title: ReactNode; subtitle?: ReactNode; leaving?: boolean; children: ReactNode;
+export function AuthLayout({ branding, title, subtitle, children }: {
+  branding: PublicBranding | null; title: ReactNode; subtitle?: ReactNode; children: ReactNode;
 }) {
   const { dark, toggle } = useTheme();
   const name = branding?.name ?? cachedBrandName();
@@ -130,18 +130,20 @@ export function AuthLayout({ branding, title, subtitle, leaving, children }: {
   return (
     <div className="grid min-h-dvh lg:grid-cols-[minmax(0,1.25fr)_minmax(440px,1fr)]">
       <BrandPanel name={name} tagline={branding?.tagline ?? ''} products={products} />
-      <main className="relative flex flex-col bg-surface px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-[calc(env(safe-area-inset-bottom)+20px)] md:px-10">
+      <main className="relative isolate flex flex-col overflow-hidden bg-surface px-5 pt-[calc(env(safe-area-inset-top)+16px)] pb-[calc(env(safe-area-inset-bottom)+20px)] md:px-10">
+        {/* The only motion on this side: one soft accent light drifting slowly behind the form. */}
+        <div aria-hidden className="auth-light pointer-events-none absolute top-1/2 left-1/2 -z-10 size-[min(640px,120vw)]" />
         <div className="flex items-center justify-end">
           <IconButton label={dark ? '切换到浅色' : '切换到深色'} onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
         </div>
-        <div className={cn('mx-auto flex w-full max-w-[360px] flex-1 flex-col justify-center py-8 lg:py-12', leaving && 'anim-leave')}>
+        <div className="mx-auto flex w-full max-w-[360px] flex-1 flex-col justify-center py-8 lg:py-12">
           <CompactBrand name={name} tagline={branding?.tagline ?? ''} />
-          <p className="anim-rise mb-3 flex items-center gap-2 text-xs font-medium text-primary" style={step(1)}><span className="size-1.5 rounded-[2px] bg-primary" />管理后台</p>
-          <h1 className="anim-rise font-display text-[28px] leading-tight font-semibold" style={step(2)}>{title}</h1>
-          {subtitle && <p className="anim-rise mt-2 text-sm text-muted" style={step(3)}>{subtitle}</p>}
-          <div className="anim-rise mt-8" style={step(4)}>{children}</div>
+          <p className="mb-3 flex items-center gap-2 text-xs font-medium text-primary"><span className="size-1.5 rounded-[2px] bg-primary" />管理后台</p>
+          <h1 className="font-display text-[28px] leading-tight font-semibold">{title}</h1>
+          {subtitle && <p className="mt-2 text-sm text-muted">{subtitle}</p>}
+          <div className="mt-8">{children}</div>
           {products.length > 0 && (
-            <div className="anim-rise mt-8 flex items-center gap-2.5 text-xs text-muted lg:hidden" style={step(6)}>
+            <div className="mt-8 flex items-center gap-2.5 text-xs text-muted lg:hidden">
               <span className="flex -space-x-1">{products.slice(0, 5).map(p => <span key={p.id} title={p.name}><ProductAvatar id={p.id} name={p.name} color={p.color} size="sm" className="rounded-full ring-2 ring-surface" /></span>)}</span>
               <span className="truncate">{products.map(p => p.name).join(' · ')}</span>
             </div>
@@ -171,22 +173,20 @@ export function LoginPage({ message, onSignedIn }: { message?: string; onSignedI
   const [reveal, setReveal] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
   const [error, setError] = useState(message || '');
-  const [shake, setShake] = useState(0);
   const [phase, setPhase] = useState<'idle' | 'busy' | 'done'>('idle');
   const passwordRef = useRef<HTMLInputElement>(null);
   const name = branding?.name ?? cachedBrandName();
   return (
-    <AuthLayout branding={branding} leaving={phase === 'done'} title="欢迎回来" subtitle={<>登录 {name}，继续管理授权与卡密</>}>
-      <form key={shake} className={cn('grid gap-4', shake > 0 && 'anim-shake')} onSubmit={async e => {
+    <AuthLayout branding={branding} title="欢迎回来" subtitle={<>登录 {name}，继续管理授权与卡密</>}>
+      <form className="grid gap-4" onSubmit={async e => {
         e.preventDefault(); setPhase('busy'); setError('');
         try {
           const result = await api<{ csrf: string }>('/api/login', 'POST', { username, password });
           storage.set('username', username); setCsrf(result.csrf); setPassword('');
           setPhase('done');
-          await new Promise(resolve => setTimeout(resolve, 380)); // let the success state and exit animation play
           await onSignedIn();
         } catch (err) {
-          setError((err as Error).message); setPassword(''); setPhase('idle'); setShake(n => n + 1);
+          setError((err as Error).message); setPassword(''); setPhase('idle');
           requestAnimationFrame(() => passwordRef.current?.focus());
         }
       }}>
@@ -197,12 +197,10 @@ export function LoginPage({ message, onSignedIn }: { message?: string; onSignedI
             onKeyUp={e => setCapsLock(e.getModifierState('CapsLock'))} onBlur={() => setCapsLock(false)}
             trailing={<IconButton label={reveal ? '隐藏密码' : '显示密码'} size="sm" onClick={() => setReveal(v => !v)}>{reveal ? <EyeOff /> : <Eye />}</IconButton>} />
         </Field>
-        {error && <p role="alert" className="anim-pop rounded-lg bg-danger-soft px-3 py-2.5 text-[13px] text-danger">{error}</p>}
+        {error && <p role="alert" className="rounded-lg bg-danger-soft px-3 py-2.5 text-[13px] text-danger">{error}</p>}
         <Button type="submit" variant="primary" size="lg" loading={phase === 'busy'} disabled={phase === 'done'}
-          className="group/btn relative mt-1 w-full overflow-hidden md:h-10 disabled:opacity-100">
-          {/* A light sheen sweeps across the button on hover. */}
-          <span aria-hidden className="pointer-events-none absolute inset-y-0 left-0 w-1/3 -translate-x-[120%] bg-gradient-to-r from-transparent via-white/25 to-transparent group-hover/btn:animate-[sheen_.9s_ease-out]" />
-          {phase === 'done' ? <><Check className="anim-pop" />登录成功</> : <>登录<ArrowRight className="transition-transform group-hover/btn:translate-x-0.5" /></>}
+          className="mt-1 w-full md:h-10 disabled:opacity-100">
+          {phase === 'done' ? <><Check />登录成功</> : <>登录<ArrowRight /></>}
         </Button>
       </form>
     </AuthLayout>
