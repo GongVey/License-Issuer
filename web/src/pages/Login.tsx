@@ -13,36 +13,108 @@ import { BrandMark, Wordmark } from '../layout/Logo';
 // Entrance order for the staggered fade-up (see .anim-rise).
 const step = (i: number) => ({ '--i': i }) as CSSProperties;
 
-// 守黑: the ink brand canvas, kept to type and light. Two soft accent lights drift slowly behind a small brand mark
-// (top) and one large statement (bottom); nothing else competes with them.
+// Accent shades for the network art, derived from the brand color so a new accent re-themes it.
+const netColors = {
+  '--net-hi': 'color-mix(in oklab, var(--accent) 55%, white)',
+  '--net-lo': 'color-mix(in oklab, var(--accent) 55%, black)',
+  '--net-glow': 'color-mix(in oklab, var(--accent) 80%, white)',
+  '--net-pulse': 'color-mix(in oklab, var(--accent) 30%, white)',
+} as CSSProperties;
+
+// The license hub: a glowing round node with a key, and a ring that ripples outward.
+function Hub({ id }: { id: string }) {
+  return (
+    <g>
+      <circle className="net-ripple" r="48" fill="none" stroke="var(--net-glow)" strokeWidth="1.5" />
+      <circle r="46" fill={`url(#${id}-hub)`} stroke="white" strokeOpacity=".22" />
+      <circle r="38" fill="none" stroke="white" strokeOpacity=".16" />
+      <ellipse cx="0" cy="-24" rx="26" ry="12" fill="white" opacity=".1" />
+      {/* lucide "key-round", centred and scaled */}
+      <g transform="translate(-21 -21) scale(1.75)" fill="none" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" />
+        <circle cx="16.5" cy="7.5" r=".5" fill="white" />
+      </g>
+    </g>
+  );
+}
+function HubDefs({ id }: { id: string }) {
+  return (
+    <defs>
+      <radialGradient id={`${id}-glow`}><stop offset="0" style={{ stopColor: 'var(--net-glow)', stopOpacity: 0.4 }} /><stop offset="1" style={{ stopColor: 'var(--net-glow)', stopOpacity: 0 }} /></radialGradient>
+      <radialGradient id={`${id}-hub`} cx="35%" cy="30%" r="80%"><stop offset="0" style={{ stopColor: 'var(--net-hi)' }} /><stop offset=".55" style={{ stopColor: 'var(--accent)' }} /><stop offset="1" style={{ stopColor: 'var(--net-lo)' }} /></radialGradient>
+    </defs>
+  );
+}
+
+// Devices on two orbits around the hub. Labels are illustrative, like a system diagram.
+const DEVICES = [
+  { angle: -150, r: 118, name: 'MacBook Pro', state: '已激活' }, { angle: -30, r: 118, name: 'Win-PC-03', state: '已激活' },
+  { angle: 90, r: 118, name: 'iMac', state: '重复激活' }, { angle: -100, r: 200, name: 'Surface', state: '已激活' },
+  { angle: 20, r: 200, name: 'ThinkPad', state: '已激活' }, { angle: 150, r: 200, name: 'Mac mini', state: '待激活' },
+];
+
+// 守黑: an ink canvas with one illustration. A license hub sits on a faint grid; activations travel along curved
+// links to the devices around it, each device's status light answering as a pulse arrives.
+function NetworkArt() {
+  return (
+    <svg viewBox="-265 -250 530 470" className="h-full w-full" aria-hidden>
+      <HubDefs id="net" />
+      <circle r="160" fill="url(#net-glow)" />
+      <g className="net-spin"><circle r="118" fill="none" stroke="white" strokeOpacity=".12" strokeDasharray="2 7" /></g>
+      <g className="net-spin net-spin-rev"><circle r="200" fill="none" stroke="white" strokeOpacity=".09" strokeDasharray="2 9" /></g>
+      <circle r="262" fill="none" stroke="white" strokeOpacity=".05" />
+      {DEVICES.map((d, i) => {
+        const t = (d.angle * Math.PI) / 180, x = Math.cos(t) * d.r, y = Math.sin(t) * d.r;
+        const path = `M0,0 Q${Math.cos(t) * d.r * 0.42},${Math.sin(t) * d.r * 0.42 - 20} ${x},${y}`;
+        const delay = { animationDelay: `${i * 0.53}s` };
+        return (
+          <g key={d.name}>
+            <path d={path} fill="none" stroke="var(--net-glow)" strokeOpacity=".22" />
+            <path d={path} fill="none" stroke="var(--net-pulse)" strokeWidth="2.2" strokeLinecap="round" className="net-pulse" style={delay} />
+            <g transform={`translate(${x} ${y})`}>
+              <rect x="-54" y="-17" width="108" height="34" rx="9" fill="#0d1312" stroke="white" strokeOpacity=".14" />
+              <rect x="-44" y="-7" width="16" height="11" rx="2" fill="none" stroke="white" strokeOpacity=".6" strokeWidth="1.3" />
+              <line x1="-40" x2="-32" y1="7" y2="7" stroke="white" strokeOpacity=".6" strokeWidth="1.3" />
+              <text x="-22" y="-1" fontSize="10" fontWeight="600" fill="currentColor">{d.name}</text>
+              <text x="-22" y="10" fontSize="8.5" fill="currentColor" opacity=".5">{d.state}</text>
+              <circle cx="44" cy="0" r="3.2" fill={d.state === '待激活' ? '#8a8f8e' : 'var(--net-glow)'} className="net-blink" style={{ animationDelay: `${i * 0.53 + 0.8}s` }} />
+            </g>
+          </g>
+        );
+      })}
+      <Hub id="net" />
+    </svg>
+  );
+}
+
 function BrandPanel({ name, tagline }: { name: string; tagline: string }) {
   return (
-    <aside className="relative isolate hidden overflow-hidden bg-ink text-ink-fg lg:flex lg:flex-col">
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10">
-        <div className="ink-light ink-light-a" />
-        <div className="ink-light ink-light-b" />
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,rgb(0_0_0/0.35))]" />
-      </div>
+    <aside className="relative isolate hidden overflow-hidden bg-ink text-ink-fg lg:flex lg:flex-col" style={netColors}>
+      <div aria-hidden className="net-grid pointer-events-none absolute inset-0 -z-10" />
       <div className="anim-rise flex items-center gap-3 px-14 pt-12" style={step(0)}>
         <BrandMark inverted name={name} />
         <Wordmark name={name} className="text-[17px]" />
       </div>
-      <div className="mt-auto px-14 pb-16">
-        <span aria-hidden className="anim-rise mb-7 block h-px w-12 bg-[color-mix(in_oklab,var(--accent)_70%,white)]" style={step(1)} />
-        <h2 className="anim-rise max-w-lg font-display text-[44px] leading-[1.15] font-semibold text-balance xl:text-[52px]" style={step(2)}>{tagline || '软件授权与卡密管理'}</h2>
-        <p className="anim-rise mt-5 text-[15px] text-ink-fg/55" style={step(3)}>在线激活，离线使用。</p>
+      <div className="anim-rise min-h-0 flex-1 px-10 py-6" style={step(1)}><NetworkArt /></div>
+      <div className="anim-rise px-14 pb-14" style={step(2)}>
+        <h2 className="font-display text-[30px] leading-tight font-semibold xl:text-[34px]">一张卡密，多台设备</h2>
+        <p className="mt-2 text-sm text-ink-fg/50">{tagline || '软件授权与卡密管理'} · 签名授权 · 离线校验 · 实时激活记录</p>
       </div>
     </aside>
   );
 }
 
-// Phones and tablets: the brand panel condensed into one ink card above the form.
+// Phones and tablets: the brand panel condensed into one ink card above the form, with the hub on the right.
 function CompactBrand({ name, tagline }: { name: string; tagline: string }) {
   return (
-    <div className="anim-rise relative isolate mb-9 overflow-hidden rounded-2xl bg-ink px-5 py-6 text-ink-fg lg:hidden" style={step(0)}>
-      <div aria-hidden className="ink-light ink-light-a -z-10" />
-      <div className="flex items-center gap-3"><BrandMark inverted name={name} /><Wordmark name={name} className="text-[17px]" /></div>
-      <p className="mt-6 text-xl font-semibold">{tagline || '软件授权与卡密管理'}</p>
+    <div className="anim-rise relative isolate mb-9 flex items-center gap-4 overflow-hidden rounded-2xl bg-ink px-5 py-5 text-ink-fg lg:hidden" style={{ ...step(0), ...netColors }}>
+      <div aria-hidden className="net-grid pointer-events-none absolute inset-0 -z-10" />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2.5"><BrandMark inverted name={name} className="size-7 text-[13px]" /><Wordmark name={name} className="truncate text-base" /></div>
+        <p className="mt-4 text-lg font-semibold">一张卡密，多台设备</p>
+        <p className="mt-0.5 truncate text-xs text-ink-fg/50">{tagline || '软件授权与卡密管理'}</p>
+      </div>
+      <svg viewBox="-80 -80 160 160" className="size-24 shrink-0" aria-hidden><HubDefs id="hub-sm" /><circle r="78" fill="url(#hub-sm-glow)" /><Hub id="hub-sm" /></svg>
     </div>
   );
 }

@@ -103,26 +103,26 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Sign-in ink panel lights: soft accent glows that drift slowly. Resting position is set without animation,
-     so reduced motion leaves them in place. */
-  .ink-light { position: absolute; pointer-events: none; border-radius: 9999px; }
-  .ink-light-a {
-    width: 90%; aspect-ratio: 1; right: -30%; bottom: -45%;
-    background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 60%, transparent), transparent);
-    animation: ink-drift-a 16s ease-in-out infinite alternate;
+  /* Sign-in network art: a faint grid fading out from the centre of the ink panel. */
+  .net-grid {
+    background-image: linear-gradient(rgb(255 255 255 / 4%) 1px, transparent 1px), linear-gradient(90deg, rgb(255 255 255 / 4%) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: radial-gradient(60% 55% at 50% 48%, black, transparent);
   }
-  .ink-light-b {
-    width: 60%; aspect-ratio: 1; left: -20%; top: -25%;
-    background: radial-gradient(closest-side, color-mix(in oklab, var(--accent) 22%, transparent), transparent);
-    animation: ink-drift-b 20s ease-in-out infinite alternate;
-  }
+  .net-spin { animation: net-spin 80s linear infinite; }
+  .net-spin-rev { animation-duration: 120s; animation-direction: reverse; }
+  .net-pulse { stroke-dasharray: 18 420; animation: net-travel 3.2s cubic-bezier(.5, 0, .5, 1) infinite; }
+  .net-ripple { transform-box: fill-box; transform-origin: center; animation: net-ripple 3.2s ease-out infinite; }
+  .net-blink { animation: net-blink 3.2s ease-in-out infinite; }
   .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
   .tabular, .font-display { font-feature-settings: "tnum", "cv11"; }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }
-@keyframes ink-drift-a { to { transform: translate(-18%, -14%) scale(1.12); } }
-@keyframes ink-drift-b { to { transform: translate(22%, 16%) scale(.9); } }
+@keyframes net-spin { to { transform: rotate(360deg); } }
+@keyframes net-travel { from { stroke-dashoffset: 0; opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } to { stroke-dashoffset: -400; opacity: 0; } }
+@keyframes net-ripple { from { transform: scale(1); opacity: .55; } to { transform: scale(1.9); opacity: 0; } }
+@keyframes net-blink { 0%, 70% { opacity: .35; } 85% { opacity: 1; } 100% { opacity: .35; } }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
 @keyframes leave { to { opacity: 0; transform: translateY(-8px) scale(.98); filter: blur(4px); } }
 @keyframes sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(220%) skewX(-20deg); } }
