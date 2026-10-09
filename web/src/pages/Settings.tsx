@@ -12,7 +12,7 @@ import { useToast } from '../ui/feedback';
 import { BrandMark } from '../layout/Logo';
 import { PageHeader } from './PageHeader';
 
-const ACCENTS = ['#4f46e5', '#2563eb', '#0891b2', '#0f766e', '#16a34a', '#7c3aed', '#db2777', '#ea580c'];
+const ACCENTS = ['#0b7f73', '#0c0c10', '#2b62d9', '#4f46e5', '#7c3aed', '#c2410c', '#be123c', '#15803d'];
 const PRODUCT_COLORS = ['#2f7ae5', '#e4572e', '#0f9488', '#7c5cdb', '#d08a0e', '#d6457a', '#3a9b4a', '#64748b'];
 const SECTIONS = [['branding', '品牌'], ['products', '产品'], ['templates', '发货模板'], ['presets', '生成预设'], ['appearance', '外观'], ['account', '账号'], ['data', '数据与接入']] as const;
 const PLACEHOLDERS: Array<[string, string]> = [['{cardCode}', '卡密'], ['{product}', '产品名称'], ['{edition}', '版本'], ['{maxDevices}', '设备上限'], ['{customer}', '客户']];

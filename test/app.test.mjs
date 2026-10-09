@@ -542,7 +542,12 @@ test('activation log, device release, edits, batch status and dashboard trend', 
   assert.equal(batches.total, 1); assert.equal(batches.items[0].activatedCards, 1);
   const dashboard = (await f.request('/api/dashboard?tz=-480')).body;
   assert.equal(dashboard.trend.length, 30);
-  assert.deepEqual(dashboard.trend.at(-1), { date: dashboard.trend.at(-1).date, activated: 2, renewed: 1, failed: 2 });
+  assert.deepEqual(dashboard.trend.at(-1), { date: dashboard.trend.at(-1).date, activated: 2, renewed: 1, failed: 2, issued: 1 });
+  assert.equal(dashboard.previousTrend.length, 30);
+  assert.deepEqual(dashboard.outcomes, { activated: 2, renewed: 1, device_limit: 1, card_disabled: 1 });
+  const week = (await f.request('/api/dashboard?tz=-480&days=7')).body;
+  assert.equal(week.trend.length, 7); assert.equal(week.previousTrend.length, 7);
+  assert.equal((await f.request('/api/dashboard?days=12')).body.trend.length, 30);
   assert.equal(dashboard.products.find(x => x.productId === 'photoarchiver').full, 1);
 });
 

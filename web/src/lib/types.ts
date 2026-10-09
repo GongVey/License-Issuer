@@ -26,7 +26,7 @@ export interface ActivationLogItem {
 }
 export interface AuditItem { id: number; at: number; action: string; target: string; detail: string }
 export interface ProductStats { productId: string; total: number; unused: number; partial: number; full: number; disabled: number; activations: number; capacity: number }
-export interface TrendDay { date: string; activated: number; renewed: number; failed: number }
-export interface Dashboard { totals: { total: number; active: number; disabled: number; activations: number; capacity: number }; products: ProductStats[]; trend: TrendDay[]; outcomes: Record<string, number> }
+export interface TrendDay { date: string; activated: number; renewed: number; failed: number; issued: number }
+export interface Dashboard { totals: { total: number; active: number; disabled: number; activations: number; capacity: number }; products: ProductStats[]; trend: TrendDay[]; previousTrend: TrendDay[]; outcomes: Record<string, number> }
 export interface LookupResult { kind: 'empty' | 'cardCode' | 'machine' | 'id' | 'text'; cards: Card[] }
 export interface GeneratedCard extends CardDetail { cardCode: string }

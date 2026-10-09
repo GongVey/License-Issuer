@@ -10,7 +10,7 @@ const LEGACY_COLORS = { teal: '#0f9488', indigo: '#4f5bd5', amber: '#d08a0e', ro
 const DEFAULT_NAMES = { photoarchiver: '照片归档', wallpaper: '一池锦鲤' };
 const DEFAULT_COLORS = { photoarchiver: '#2f7ae5', wallpaper: '#e4572e' };
 const HEX = /^#[0-9a-f]{6}$/i;
-export const DEFAULT_BRANDING = { name: '知白Studio', tagline: '软件授权与卡密管理', accent: '#4f46e5', showProducts: true };
+export const DEFAULT_BRANDING = { name: '知白Studio', tagline: '软件授权与卡密管理', accent: '#0b7f73', showProducts: true };
 export const DEFAULT_TEMPLATE = '您好，感谢购买 {product}！\n\n激活码：{cardCode}\n\n使用方法：打开软件 → 授权 → 粘贴激活码，联网激活一次后即可离线使用。\n每个激活码最多可在 {maxDevices} 台电脑上激活。';
 const CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/;
 

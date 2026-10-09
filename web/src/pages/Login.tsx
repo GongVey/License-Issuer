@@ -22,8 +22,8 @@ function LicenseIllustration({ name }: { name: string }) {
       <div className="absolute inset-x-8 -bottom-4 h-full rotate-[-4deg] rounded-2xl bg-white/[0.04] ring-1 ring-white/10" />
       <div className="glass relative rounded-2xl p-6 shadow-[0_30px_60px_-20px_rgb(0_0_0/0.6)]">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-2 text-[13px] font-semibold text-ink-fg"><BrandMark name={name} className="size-6 rounded-md text-[11px]" />{name}</span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#1baf7a]/15 px-2 py-0.5 text-[11px] font-medium text-[#6fdcb0]"><span className="size-1.5 rounded-full bg-current" />已激活</span>
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-ink-fg"><BrandMark inverted name={name} className="size-6 rounded-md text-[11px]" />{name}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[color-mix(in_oklab,var(--accent)_28%,transparent)] px-2 py-0.5 text-[11px] font-medium text-[color-mix(in_oklab,var(--accent)_45%,white)]"><span className="size-1.5 rounded-full bg-current" />已激活</span>
         </div>
         <p className="mt-6 text-[11px] tracking-[0.14em] text-ink-muted uppercase">License Key</p>
         <p className="mt-1.5 font-mono text-[17px] tracking-wider text-ink-fg">LIC-7Q4M-<span className="text-ink-muted">••••-••••</span>-K2XD</p>
@@ -31,7 +31,7 @@ function LicenseIllustration({ name }: { name: string }) {
           <div>
             <p className="text-[11px] text-ink-muted">设备额度</p>
             <div className="mt-2 flex items-center gap-2">
-              <span className="flex gap-1">{[1, 1, 0].map((on, i) => <i key={i} className={on ? 'h-3.5 w-2 rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_65%,white)]' : 'h-3.5 w-2 rounded-[3px] bg-white/15'} />)}</span>
+              <span className="flex gap-1">{[1, 1, 0].map((on, i) => <i key={i} className={on ? 'h-3.5 w-2 rounded-[3px] bg-[color-mix(in_oklab,var(--accent)_55%,white)]' : 'h-3.5 w-2 rounded-[3px] bg-white/15'} />)}</span>
               <span className="text-[13px] font-medium text-ink-fg">2 / 3</span>
             </div>
           </div>
@@ -52,7 +52,7 @@ function BrandPanel({ branding }: { branding: PublicBranding | null }) {
     <aside className="brand-panel relative hidden overflow-hidden text-ink-fg lg:flex lg:flex-col">
       <div className="brand-grid pointer-events-none absolute inset-0" aria-hidden />
       <div className="relative flex items-center gap-3 px-12 pt-10">
-        <BrandMark name={name} className="size-9 text-base" />
+        <BrandMark inverted name={name} className="size-9 text-base" />
         <Wordmark name={name} className="text-lg text-ink-fg" />
       </div>
       <div className="relative my-auto grid gap-12 px-12 py-10 xl:px-16">

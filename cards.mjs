@@ -291,7 +291,7 @@ export function setBatchStatus(db, batchId, input, now) {
   return getBatch(db, batchId);
 }
 
-export function cardSummary(db, config = {}, now = Date.now(), tzOffset = 0) {
+export function cardSummary(db, config = {}, now = Date.now(), tzOffset = 0, days = 30) {
   const totals = db.prepare(`SELECT count(*) AS total,
     sum(CASE WHEN status='active' THEN 1 ELSE 0 END) AS active,
     sum(CASE WHEN status='disabled' THEN 1 ELSE 0 END) AS disabled,
@@ -308,19 +308,25 @@ export function cardSummary(db, config = {}, now = Date.now(), tzOffset = 0) {
   // Day buckets follow the viewer's time zone; tzOffset is Date#getTimezoneOffset() in minutes.
   const shift = tzOffset * 60000;
   const today = Math.floor((now - shift) / 86400000);
+  // The selected window plus the one before it, so the client can compare periods.
+  const start = (today - 2 * days + 1) * 86400000 + shift, current = (today - days + 1) * 86400000 + shift;
   const byDay = new Map(db.prepare(`SELECT CAST(at - ? AS INTEGER) / 86400000 AS day, sum(result='activated') AS activated, sum(result='renewed') AS renewed,
       sum(result NOT IN ('activated','renewed')) AS failed
-    FROM activation_log WHERE at >= ? GROUP BY day`).all(shift, (today - 29) * 86400000 + shift).map(row => [Number(row.day), row]));
-  const trend = Array.from({ length: 30 }, (_, i) => {
-    const day = today - 29 + i;
+    FROM activation_log WHERE at >= ? GROUP BY day`).all(shift, start).map(row => [Number(row.day), row]));
+  const issuedByDay = new Map(db.prepare('SELECT CAST(issuedAt - ? AS INTEGER) / 86400000 AS day, count(*) AS n FROM cards WHERE issuedAt >= ? GROUP BY day')
+    .all(shift, start).map(row => [Number(row.day), Number(row.n)]));
+  const series = from => Array.from({ length: days }, (_, i) => {
+    const day = from + i;
     const row = byDay.get(day) || {};
-    return { date: new Date(day * 86400000).toISOString().slice(0, 10), activated: Number(row.activated || 0), renewed: Number(row.renewed || 0), failed: Number(row.failed || 0) };
+    return { date: new Date(day * 86400000).toISOString().slice(0, 10), activated: Number(row.activated || 0), renewed: Number(row.renewed || 0),
+      failed: Number(row.failed || 0), issued: issuedByDay.get(day) || 0 };
   });
-  // Request outcomes over the same 30-day window, for the success rate and failure breakdown.
+  const trend = series(today - days + 1), previousTrend = series(today - 2 * days + 1);
+  // Request outcomes over the selected window, for the success rate and failure breakdown.
   const outcomes = Object.fromEntries(db.prepare('SELECT result, count(*) AS n FROM activation_log WHERE at >= ? GROUP BY result')
-    .all((today - 29) * 86400000 + shift).map(row => [row.result, Number(row.n)]));
+    .all(current).map(row => [row.result, Number(row.n)]));
   const recent = db.prepare(`SELECT cardId, productId, edition, issuedAt, status, note, ${used} AS usedDevices FROM cards c ORDER BY issuedAt DESC, cardId LIMIT 5`).all();
-  return { totals: Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Number(value || 0)])), products: productStats, trend, outcomes, recent };
+  return { totals: Object.fromEntries(Object.entries(totals).map(([key, value]) => [key, Number(value || 0)])), products: productStats, trend, previousTrend, outcomes, recent };
 }
 
 export function allowActivation(db, address, now) {

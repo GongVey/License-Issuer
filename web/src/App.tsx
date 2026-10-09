@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { api } from './lib/api';
 import { navigate, useRoute } from './lib/router';
 import { AppShell } from './layout/AppShell';
@@ -7,14 +7,16 @@ import { BatchesPage } from './pages/Batches';
 import { CardsPage } from './pages/Cards';
 import { AuthLayout, LoginPage } from './pages/Login';
 import { LogsPage } from './pages/Logs';
-import { OverviewPage } from './pages/Overview';
 import { AccountForm, SettingsPage } from './pages/Settings';
 import { SessionProvider, useSession, useSessionLoader } from './session';
 import { Button } from './ui/controls';
 import { BrandMark } from './layout/Logo';
 import { cachedBrandName } from './lib/brand';
 
-const PAGES: Record<string, { title: string; Page: () => React.JSX.Element }> = {
+// The overview carries the chart library, so it loads on demand and the other pages stay light.
+const OverviewPage = lazy(() => import('./pages/Overview').then(m => ({ default: m.OverviewPage })));
+
+const PAGES: Record<string, { title: string; Page: React.ComponentType }> = {
   '/overview': { title: '概览', Page: OverviewPage },
   '/cards': { title: '卡密', Page: CardsPage },
   '/batches': { title: '批次', Page: BatchesPage },
@@ -40,7 +42,7 @@ function Routes() {
   const { settings } = useSession();
   useEffect(() => { document.title = `${page?.title ?? '概览'} · ${settings.branding.name}`; window.scrollTo(0, 0); }, [page, settings.branding.name]);
   if (!page) return null;
-  return <AppShell><page.Page key={path} /></AppShell>;
+  return <AppShell><Suspense fallback={null}><page.Page key={path} /></Suspense></AppShell>;
 }
 
 function ForcePassword() {

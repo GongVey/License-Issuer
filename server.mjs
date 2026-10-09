@@ -56,7 +56,8 @@ export function createApp(config, { clock = Date.now } = {}) {
   const routes = [
     ['GET', '/api/dashboard', c => {
       const tz = Number(c.url.searchParams.get('tz') || 0);
-      return cardSummary(db, config, c.now, Number.isInteger(tz) && Math.abs(tz) <= 840 ? tz : 0);
+      const days = Number(c.url.searchParams.get('days') || 30);
+      return cardSummary(db, config, c.now, Number.isInteger(tz) && Math.abs(tz) <= 840 ? tz : 0, [7, 30, 90].includes(days) ? days : 30);
     }],
     ['POST', '/api/lookup', async c => lookup(db, await c.body(), config)],
     ['GET', '/api/cards', c => listCards(db, c.url.searchParams, config)],

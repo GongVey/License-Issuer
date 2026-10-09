@@ -9,49 +9,54 @@
  */
 :root {
   color-scheme: light;
-  --accent: #4f46e5;
-  --bg: #f4f5f9; --surface: #ffffff; --surface-2: #f0f2f7; --surface-3: #e3e6ee; --hover: #f2f4f8;
-  --line: #e3e6ed; --line-strong: #d0d4de;
-  --fg: #12142a; --fg-2: #474c63; --muted: #777d95;
+  --accent: #0b7f73;
+  --bg: #f7f7f8; --surface: #ffffff; --surface-2: #f4f4f6; --surface-3: #e8e8ec; --hover: #f4f4f6;
+  --line: #ebebee; --line-strong: #dcdce1;
+  --fg: #0c0c10; --fg-2: #4a4a54; --muted: #83838e;
   --primary: var(--accent);
-  --ok: #1a7f4e; --ok-soft: #e3f4ea; --warn: #a15c07; --warn-soft: #fbf0dc; --danger: #c93636; --danger-soft: #fbe6e6;
-  --info: #2a63c4; --info-soft: #e5eefc; --neutral-soft: #eceef4;
-  /* Chart series (validated for CVD and contrast; text never wears these). */
-  --chart-ok: #2a78d6; --chart-fail: #eb6834; --chart-track: #e8ebf2;
-  --st-unused: #2a78d6; --st-partial: #eda100; --st-full: #1baf7a; --st-disabled: #b3b8c7;
-  /* Navy sidebar (dark in both themes) */
-  --ink: #111427; --ink-2: #1c2038; --ink-line: #272c48; --ink-fg: #e8eaf4; --ink-muted: #8a90ad;
-  --shadow-xs: 0 1px 2px rgb(18 20 42 / 5%);
-  --shadow-sm: 0 1px 3px rgb(18 20 42 / 7%), 0 1px 2px rgb(18 20 42 / 4%);
-  --shadow-lg: 0 24px 48px -16px rgb(18 20 42 / 24%), 0 8px 20px -10px rgb(18 20 42 / 12%);
+  --ok: #138055; --ok-soft: #e6f5ee; --warn: #a35c00; --warn-soft: #fcf1df; --danger: #d13438; --danger-soft: #fdeceb;
+  --info: #2b62d9; --info-soft: #e9f0fd; --neutral-soft: #efeff2;
+  /* Charts: the main series follows the brand; state colors are a fixed set validated for CVD and contrast. */
+  --chart-primary: var(--primary); --chart-compare: #b5b6bf; --chart-fail: #e5484d; --chart-track: #efeff2; --chart-grid: #ededf0;
+  --chart-ok: var(--primary);
+  --st-unused: #0f9b8e; --st-partial: #e8a33d; --st-full: #5b6cf0; --st-disabled: #c9cbd1;
+  /* Sidebar: same paper as the page, divided by a hairline. */
+  --side: #fbfbfc; --side-2: #efeff2; --side-line: #ebebee; --side-fg: #0c0c10; --side-muted: #74747f;
+  /* Ink: always dark (sign-in brand panel). */
+  --ink: #0b0b0e; --ink-2: #16161b; --ink-line: #24242a; --ink-fg: #f1f1f3; --ink-muted: #8b8b96;
+  --shadow-xs: 0 1px 2px rgb(12 12 16 / 4%);
+  --shadow-sm: 0 1px 2px rgb(12 12 16 / 4%), 0 2px 6px -2px rgb(12 12 16 / 6%);
+  --shadow-lg: 0 20px 44px -12px rgb(12 12 16 / 22%), 0 6px 16px -8px rgb(12 12 16 / 10%);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --bg: #0b0d18; --surface: #131628; --surface-2: #1a1e33; --surface-3: #252a42; --hover: #191c30;
-    --line: #22263c; --line-strong: #32374f;
-    --fg: #e9ebf5; --fg-2: #b3b8cc; --muted: #7f859e;
-    --primary: color-mix(in oklab, var(--accent) 86%, white);
-    --ok: #4fc68a; --ok-soft: #11281e; --warn: #e8ac4c; --warn-soft: #2b2110; --danger: #f07474; --danger-soft: #311619;
-    --info: #7eaaf2; --info-soft: #14213b; --neutral-soft: #1d2135;
-    --chart-ok: #3987e5; --chart-fail: #d95926; --chart-track: #22263c;
-    --st-unused: #3987e5; --st-partial: #c98500; --st-full: #199e70; --st-disabled: #4a4f68;
-    --ink: #080a14; --ink-2: #141729; --ink-line: #1f2338;
-    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 70%);
+    --bg: #09090b; --surface: #111114; --surface-2: #18181c; --surface-3: #232328; --hover: #18181c;
+    --line: #222227; --line-strong: #303036;
+    --fg: #eeeef0; --fg-2: #b3b3bc; --muted: #7c7c87;
+    --primary: color-mix(in oklab, var(--accent) 92%, white);
+    --ok: #3fc58c; --ok-soft: #0f251b; --warn: #e6a94e; --warn-soft: #2a1f0e; --danger: #f2666a; --danger-soft: #2f1416;
+    --info: #79a6f6; --info-soft: #132038; --neutral-soft: #1c1c21;
+    --chart-compare: #4a4a53; --chart-fail: #ec5d5e; --chart-track: #1e1e23; --chart-grid: #1f1f24;
+    --st-unused: #14a596; --st-partial: #c4851f; --st-full: #7183f5; --st-disabled: #46474e;
+    --side: #0c0c0f; --side-2: #1a1a1f; --side-line: #1f1f24; --side-fg: #eeeef0; --side-muted: #7c7c87;
+    --ink: #060608; --ink-2: #121216; --ink-line: #1f1f24;
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 20px 44px -12px rgb(0 0 0 / 70%);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #0b0d18; --surface: #131628; --surface-2: #1a1e33; --surface-3: #252a42; --hover: #191c30;
-  --line: #22263c; --line-strong: #32374f;
-  --fg: #e9ebf5; --fg-2: #b3b8cc; --muted: #7f859e;
-  --primary: color-mix(in oklab, var(--accent) 86%, white);
-  --ok: #4fc68a; --ok-soft: #11281e; --warn: #e8ac4c; --warn-soft: #2b2110; --danger: #f07474; --danger-soft: #311619;
-  --info: #7eaaf2; --info-soft: #14213b; --neutral-soft: #1d2135;
-  --chart-ok: #3987e5; --chart-fail: #d95926; --chart-track: #22263c;
-  --st-unused: #3987e5; --st-partial: #c98500; --st-full: #199e70; --st-disabled: #4a4f68;
-  --ink: #080a14; --ink-2: #141729; --ink-line: #1f2338;
-  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / 70%);
+  --bg: #09090b; --surface: #111114; --surface-2: #18181c; --surface-3: #232328; --hover: #18181c;
+  --line: #222227; --line-strong: #303036;
+  --fg: #eeeef0; --fg-2: #b3b3bc; --muted: #7c7c87;
+  --primary: color-mix(in oklab, var(--accent) 92%, white);
+  --ok: #3fc58c; --ok-soft: #0f251b; --warn: #e6a94e; --warn-soft: #2a1f0e; --danger: #f2666a; --danger-soft: #2f1416;
+  --info: #79a6f6; --info-soft: #132038; --neutral-soft: #1c1c21;
+  --chart-compare: #4a4a53; --chart-fail: #ec5d5e; --chart-track: #1e1e23; --chart-grid: #1f1f24;
+  --st-unused: #14a596; --st-partial: #c4851f; --st-full: #7183f5; --st-disabled: #46474e;
+  --side: #0c0c0f; --side-2: #1a1a1f; --side-line: #1f1f24; --side-fg: #eeeef0; --side-muted: #7c7c87;
+  --ink: #060608; --ink-2: #121216; --ink-line: #1f1f24;
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 40%); --shadow-sm: 0 1px 3px rgb(0 0 0 / 50%); --shadow-lg: 0 20px 44px -12px rgb(0 0 0 / 70%);
 }
 :root {
   --primary-hover: color-mix(in oklab, var(--primary) 88%, black);
@@ -71,16 +76,17 @@
   --color-primary: var(--primary); --color-primary-hover: var(--primary-hover); --color-primary-soft: var(--primary-soft); --color-primary-strong: var(--primary-strong); --color-on-primary: var(--on-primary);
   --color-ok: var(--ok); --color-ok-soft: var(--ok-soft); --color-warn: var(--warn); --color-warn-soft: var(--warn-soft);
   --color-danger: var(--danger); --color-danger-soft: var(--danger-soft); --color-info: var(--info); --color-info-soft: var(--info-soft); --color-neutral-soft: var(--neutral-soft);
-  --color-chart-ok: var(--chart-ok); --color-chart-fail: var(--chart-fail); --color-chart-track: var(--chart-track);
+  --color-chart-ok: var(--chart-ok); --color-chart-fail: var(--chart-fail); --color-chart-track: var(--chart-track); --color-chart-primary: var(--chart-primary); --color-chart-compare: var(--chart-compare);
   --color-st-unused: var(--st-unused); --color-st-partial: var(--st-partial); --color-st-full: var(--st-full); --color-st-disabled: var(--st-disabled);
   --color-product: var(--product, #64748b);
+  --color-side: var(--side); --color-side-2: var(--side-2); --color-side-line: var(--side-line); --color-side-fg: var(--side-fg); --color-side-muted: var(--side-muted);
   --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-ink-line: var(--ink-line); --color-ink-fg: var(--ink-fg); --color-ink-muted: var(--ink-muted);
   --shadow-xs: var(--shadow-xs); --shadow-sm: var(--shadow-sm); --shadow-lg: var(--shadow-lg);
 }
 
 @layer base {
   html { -webkit-text-size-adjust: 100%; -webkit-tap-highlight-color: transparent; font-feature-settings: "cv11", "ss01"; }
-  body { @apply bg-bg text-fg font-sans text-sm antialiased; letter-spacing: -0.003em; }
+  body { @apply bg-bg text-fg font-sans text-sm antialiased; letter-spacing: -0.006em; }
   :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
@@ -97,21 +103,22 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Sign-in panel: deep navy lit by two soft accent glows, with a dot grid that fades out toward the edges. */
+  /* Sign-in panel: ink black with one jade glow rising from below, and a fine dot grid fading toward the edges. */
   .brand-panel {
     background-color: var(--ink);
     background-image:
-      radial-gradient(60% 50% at 100% 0%, color-mix(in oklab, var(--accent) 45%, transparent), transparent 70%),
-      radial-gradient(55% 45% at 0% 100%, color-mix(in oklab, var(--accent) 30%, transparent), transparent 70%);
+      radial-gradient(70% 45% at 50% 108%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
+      radial-gradient(40% 30% at 100% 0%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 70%);
   }
   .brand-grid {
-    background-image: radial-gradient(rgb(255 255 255 / 9%) 1px, transparent 1px);
-    background-size: 22px 22px;
+    background-image: radial-gradient(rgb(255 255 255 / 8%) 1px, transparent 1px);
+    background-size: 20px 20px;
     mask-image: radial-gradient(70% 60% at 50% 45%, black, transparent);
   }
   /* Frosted card on the dark panel. */
   .glass { background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); backdrop-filter: blur(12px); }
-  .font-display { font-family: var(--font-display); letter-spacing: -0.022em; }
+  .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
+  .tabular, .font-display { font-feature-settings: "tnum", "cv11"; }
 }
 
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }

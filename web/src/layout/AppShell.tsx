@@ -20,20 +20,19 @@ export const NAV = [
 // Phone tab bar: four destinations around a central "generate" action; batches live under the cards tab.
 const TABS = [NAV[0], NAV[1], null, NAV[3], { path: '/settings', label: '设置', icon: Settings }];
 
-// Sidebar item: the active entry is lifted and marked with an accent bar on its left edge.
-function InkItem({ to, active, icon, children, trailing }: { to: string; active: boolean; icon: ReactNode; children: ReactNode; trailing?: ReactNode }) {
+// Sidebar item: the active entry is a raised white chip (Linear/Stripe-style), its icon in the brand color.
+function SideItem({ to, active, icon, children, trailing }: { to: string; active: boolean; icon: ReactNode; children: ReactNode; trailing?: ReactNode }) {
   return (
     <a href={to} aria-current={active ? 'page' : undefined}
-      className={cn('group relative flex h-9 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-ink-fg/70 transition-colors hover:bg-ink-2 hover:text-ink-fg',
-        active && 'bg-[color-mix(in_oklab,var(--accent)_22%,var(--ink-2))] text-ink-fg')}>
-      {active && <span className="absolute inset-y-2 -left-3 w-[3px] rounded-r-full bg-[color-mix(in_oklab,var(--accent)_70%,white)]" aria-hidden />}
-      <span className={cn('grid size-4 place-items-center text-ink-muted group-hover:text-ink-fg/80 [&>svg]:size-4', active && 'text-ink-fg')}>{icon}</span>
+      className={cn('group flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium text-fg-2 transition-colors hover:bg-side-2 hover:text-side-fg',
+        active && 'bg-surface text-side-fg shadow-xs ring-1 ring-side-line hover:bg-surface')}>
+      <span className={cn('grid size-4 place-items-center text-side-muted group-hover:text-side-fg [&>svg]:size-4', active && 'text-primary group-hover:text-primary')}>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{children}</span>
       {trailing}
     </a>
   );
 }
-const Label = ({ children }: { children: ReactNode }) => <p className="px-3 pb-2 text-[10.5px] font-semibold tracking-[0.14em] text-ink-muted uppercase">{children}</p>;
+const Label = ({ children }: { children: ReactNode }) => <p className="px-2.5 pb-1.5 text-[11px] font-medium text-side-muted">{children}</p>;
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { path, params } = useRoute();
@@ -69,52 +68,51 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [openLookup, openGenerate]);
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[256px_minmax(0,1fr)]">
+    <div className="min-h-dvh md:grid md:grid-cols-[240px_minmax(0,1fr)]">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-dvh flex-col bg-ink text-ink-fg md:flex">
-        <a href="#/overview" className="flex items-center gap-3 px-5 pt-6 pb-6">
-          <BrandMark name={brand.name} className="size-9 text-base" />
-          <div className="min-w-0 leading-tight">
-            <Wordmark name={brand.name} className="block truncate text-[17px] text-ink-fg" />
-            {brand.tagline && <p className="mt-0.5 truncate text-[11.5px] text-ink-muted">{brand.tagline}</p>}
-          </div>
+      <aside className="sticky top-0 hidden h-dvh flex-col border-r border-side-line bg-side md:flex">
+        <a href="#/overview" className="flex items-center gap-2.5 px-4 pt-5 pb-4">
+          <BrandMark name={brand.name} />
+          <span className="min-w-0 leading-tight">
+            <Wordmark name={brand.name} className="block truncate text-[15px] text-side-fg" />
+            {brand.tagline && <span className="mt-0.5 block truncate text-[11px] text-side-muted">{brand.tagline}</span>}
+          </span>
         </a>
-        <div className="px-3 pb-5">
+        <div className="px-3 pb-4">
           <button type="button" onClick={() => openLookup()}
-            className="flex h-9 w-full items-center gap-2.5 rounded-lg border border-ink-line bg-ink-2/60 px-3 text-[13px] text-ink-muted transition-colors hover:border-ink-fg/20 hover:text-ink-fg/80">
-            <Search className="size-4 shrink-0" /><span className="flex-1 text-left">搜索卡密、机器码…</span>
-            <kbd className="font-sans text-[11px] text-ink-muted/80">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
+            className="flex h-8 w-full items-center gap-2 rounded-md border border-side-line bg-surface px-2.5 text-[13px] text-side-muted shadow-xs transition-colors hover:border-line-strong hover:text-fg-2">
+            <Search className="size-3.5 shrink-0" /><span className="flex-1 text-left">搜索卡密、机器码…</span>
+            <kbd className="rounded border border-side-line bg-side px-1 font-sans text-[10.5px] text-side-muted">{isMac ? '⌘K' : 'Ctrl K'}</kbd>
           </button>
         </div>
         <nav aria-label="主导航" className="px-3">
-          <Label>工作台</Label>
-          <div className="grid gap-0.5">
-            {NAV.map(({ path: p, label, icon: Icon }) => <InkItem key={p} to={`#${p}`} active={path === p && !productFilter} icon={<Icon />}>{label}</InkItem>)}
+          <div className="grid gap-px">
+            {NAV.map(({ path: p, label, icon: Icon }) => <SideItem key={p} to={`#${p}`} active={path === p && !productFilter} icon={<Icon />}>{label}</SideItem>)}
           </div>
         </nav>
-        <div className="mt-7 min-h-0 flex-1 overflow-y-auto px-3">
-          <Label>产品 · {settings.products.length}</Label>
-          <div className="grid gap-0.5">
+        <div className="mt-6 min-h-0 flex-1 overflow-y-auto px-3">
+          <Label>产品</Label>
+          <div className="grid gap-px">
             {settings.products.map(p => (
-              <InkItem key={p.id} to={href('/cards', { productId: p.id })} active={productFilter === p.id}
-                icon={<span className="size-2.5 rounded-full ring-[3px] ring-white/10" style={{ background: p.color }} />}
-                trailing={stock.has(p.id) && <span className="tabular rounded bg-ink-2 px-1.5 text-[11px] text-ink-muted group-hover:text-ink-fg/80" title="可售库存">{stock.get(p.id)}</span>}>
+              <SideItem key={p.id} to={href('/cards', { productId: p.id })} active={productFilter === p.id}
+                icon={<span className="size-2 rounded-[3px]" style={{ background: p.color }} />}
+                trailing={stock.has(p.id) && <span className="tabular text-[11px] text-side-muted" title="可售库存">{stock.get(p.id)}</span>}>
                 {p.name}
-              </InkItem>
+              </SideItem>
             ))}
           </div>
         </div>
-        <div className="grid gap-1 px-3 pt-3 pb-4">
+        <div className="grid gap-px px-3 pt-3 pb-3">
           <button type="button" onClick={() => openGenerate()}
-            className="mb-2 flex h-10 items-center justify-center gap-2 rounded-lg bg-primary text-[13px] font-semibold text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.18)] transition-colors hover:bg-primary-hover">
-            <Plus className="size-4" />生成卡密<kbd className="ml-1 rounded bg-black/15 px-1.5 font-sans text-[11px] font-medium">N</kbd>
+            className="mb-3 flex h-9 items-center justify-center gap-2 rounded-md bg-primary text-[13px] font-medium text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.16),0_1px_2px_rgb(0_0_0/0.12)] transition-colors hover:bg-primary-hover">
+            <Plus className="size-4" />生成卡密<kbd className="ml-1 rounded bg-black/15 px-1.5 font-sans text-[10.5px] font-medium">N</kbd>
           </button>
-          <InkItem to="#/settings" active={path === '/settings'} icon={<Settings />}>设置</InkItem>
-          <div className="mt-2 flex items-center gap-2.5 border-t border-ink-line px-1 pt-3">
-            <span className="grid size-8 place-items-center rounded-full bg-[color-mix(in_oklab,var(--accent)_35%,var(--ink-2))] text-sm font-semibold uppercase text-ink-fg ring-1 ring-white/10">{session.username.slice(0, 1)}</span>
-            <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{session.username}</span><span className="block text-[11px] text-ink-muted">管理员</span></span>
-            <IconButton label={dark ? '切换到浅色' : '切换到深色'} size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
-            <IconButton label="退出登录" size="sm" className="text-ink-muted hover:bg-ink-2 hover:text-ink-fg" onClick={logout}><LogOut /></IconButton>
+          <SideItem to="#/settings" active={path === '/settings'} icon={<Settings />}>设置</SideItem>
+          <div className="mt-2 flex items-center gap-2.5 border-t border-side-line px-1 pt-3">
+            <span className="grid size-7 place-items-center rounded-full bg-side-2 text-xs font-semibold uppercase text-side-fg ring-1 ring-side-line">{session.username.slice(0, 1)}</span>
+            <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{session.username}</span><span className="block text-[11px] text-side-muted">管理员</span></span>
+            <IconButton label={dark ? '切换到浅色' : '切换到深色'} size="sm" className="text-side-muted hover:bg-side-2 hover:text-side-fg" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
+            <IconButton label="退出登录" size="sm" className="text-side-muted hover:bg-side-2 hover:text-side-fg" onClick={logout}><LogOut /></IconButton>
           </div>
         </div>
       </aside>
@@ -129,7 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <IconButton label={dark ? '切换到浅色' : '切换到深色'} variant="secondary" className="size-10" onClick={toggle}>{dark ? <Sun /> : <Moon />}</IconButton>
           </div>
         </header>
-        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-6 pb-[calc(100px+env(safe-area-inset-bottom))] md:px-12 md:pt-12 md:pb-16">{children}</main>
+        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pt-6 pb-[calc(100px+env(safe-area-inset-bottom))] md:px-10 md:pt-9 md:pb-16">{children}</main>
       </div>
 
       {/* Phone tab bar */}
