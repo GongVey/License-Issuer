@@ -33,6 +33,17 @@ const METRICS: Array<{ key: MetricKey; label: string; unit: string; lowerIsBette
 const fmt = (v: number, percent?: boolean) => (percent ? `${v.toFixed(v >= 99.95 || v === 0 ? 0 : 1)}%` : v.toLocaleString('zh-CN'));
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
+// Fill fields an older server may not send yet (e.g. right after an upgrade, before the backend restarts).
+function normalize(data: Dashboard): Dashboard {
+  const day = (d: Partial<TrendDay> & { date: string }): TrendDay => ({ activated: 0, renewed: 0, failed: 0, issued: 0, ...d });
+  const trend = (data.trend ?? []).map(day);
+  return {
+    ...data, trend, outcomes: data.outcomes ?? {},
+    previousTrend: data.previousTrend?.map(day) ?? trend.map(d => day({ date: d.date })),
+    products: (data.products ?? []).map(p => ({ ...p, capacity: p.capacity ?? 0 })),
+  };
+}
+
 function greeting() {
   const h = new Date().getHours();
   return h < 6 ? '夜深了' : h < 12 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
@@ -57,7 +68,7 @@ export function OverviewPage() {
   const days = Number(range);
   const dashboard = useQuery({
     queryKey: ['dashboard', days], placeholderData: keepPreviousData, refetchInterval: 60000,
-    queryFn: () => api<Dashboard>(`/api/dashboard${qs({ tz: new Date().getTimezoneOffset(), days })}`),
+    queryFn: async () => normalize(await api<Dashboard>(`/api/dashboard${qs({ tz: new Date().getTimezoneOffset(), days })}`)),
   });
   const data = dashboard.data;
   const states = Object.fromEntries(STATES.map(s => [s, data?.products.reduce((n, p) => n + p[s], 0) ?? 0])) as Record<CardState, number>;

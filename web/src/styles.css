@@ -103,24 +103,32 @@
   .scrollbar-none { scrollbar-width: none; }
   .scrollbar-none::-webkit-scrollbar { display: none; }
   .tabular { font-variant-numeric: tabular-nums; }
-  /* Sign-in panel: ink black with one jade glow rising from below, and a fine dot grid fading toward the edges. */
-  .brand-panel {
-    background-color: var(--ink);
-    background-image:
-      radial-gradient(70% 45% at 50% 108%, color-mix(in oklab, var(--accent) 55%, transparent), transparent 70%),
-      radial-gradient(40% 30% at 100% 0%, color-mix(in oklab, var(--accent) 18%, transparent), transparent 70%);
+  /* Sign-in backdrop: a faint grid that fades out from the center, under two slowly drifting accent glows. */
+  .auth-grid {
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(60% 55% at 50% 40%, black, transparent);
+    opacity: .7;
   }
-  .brand-grid {
-    background-image: radial-gradient(rgb(255 255 255 / 8%) 1px, transparent 1px);
-    background-size: 20px 20px;
-    mask-image: radial-gradient(70% 60% at 50% 45%, black, transparent);
-  }
-  /* Frosted card on the dark panel. */
-  .glass { background: rgb(255 255 255 / 6%); border: 1px solid rgb(255 255 255 / 10%); backdrop-filter: blur(12px); }
+  .auth-glow { position: absolute; pointer-events: none; background: radial-gradient(closest-side, var(--glow), transparent); }
   .font-display { font-family: var(--font-display); letter-spacing: -0.025em; }
   .tabular, .font-display { font-feature-settings: "tnum", "cv11"; }
 }
 
+@keyframes rise { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } }
+@keyframes drift-a { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(14%, 10%) scale(1.15); } }
+@keyframes drift-b { 0%, 100% { transform: translate(0, 0) scale(1.1); } 50% { transform: translate(-12%, -8%) scale(.95); } }
+@keyframes stamp { 0%, 55% { opacity: 0; transform: scale(2.6); } 80% { opacity: 1; transform: scale(.8); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes leave { to { opacity: 0; transform: translateY(-8px) scale(.98); filter: blur(4px); } }
+@keyframes sheen { from { transform: translateX(-120%) skewX(-20deg); } to { transform: translateX(220%) skewX(-20deg); } }
+/* Staggered entrance: set --i on each element to order it. */
+@utility anim-rise { animation: rise .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 70ms + 80ms); }
+@utility anim-drift-a { animation: drift-a 18s ease-in-out infinite; }
+@utility anim-drift-b { animation: drift-b 22s ease-in-out infinite; }
+@utility anim-stamp { animation: stamp .9s cubic-bezier(.2, .8, .2, 1) both; }
+@utility anim-shake { animation: shake .4s ease-in-out; }
+@utility anim-leave { animation: leave .35s ease-in forwards; }
 @keyframes sheet-up { from { transform: translateY(24px); opacity: 0; } }
 @keyframes sheet-left { from { transform: translateX(24px); opacity: 0; } }
 @keyframes pop { from { transform: translateY(4px) scale(.985); opacity: 0; } }

@@ -11,10 +11,13 @@ import { AccountForm, SettingsPage } from './pages/Settings';
 import { SessionProvider, useSession, useSessionLoader } from './session';
 import { Button } from './ui/controls';
 import { BrandMark } from './layout/Logo';
+import { Skeleton } from './ui/display';
+import { ErrorBoundary, lazyPage } from './ui/ErrorBoundary';
 import { cachedBrandName } from './lib/brand';
 
 // The overview carries the chart library, so it loads on demand and the other pages stay light.
-const OverviewPage = lazy(() => import('./pages/Overview').then(m => ({ default: m.OverviewPage })));
+const loadOverview = lazyPage(() => import('./pages/Overview'));
+const OverviewPage = lazy(() => loadOverview().then(m => ({ default: m.OverviewPage })));
 
 const PAGES: Record<string, { title: string; Page: React.ComponentType }> = {
   '/overview': { title: '概览', Page: OverviewPage },
@@ -39,10 +42,27 @@ function Routes() {
   const { path } = useRoute();
   const page = PAGES[path];
   useEffect(() => { if (!page) navigate('/overview', {}, { replace: true }); }, [page]);
+  // Warm the overview chunk once signed in, so opening it later shows content immediately.
+  useEffect(() => { const id = setTimeout(() => { loadOverview().catch(() => {}); }, 1500); return () => clearTimeout(id); }, []);
   const { settings } = useSession();
   useEffect(() => { document.title = `${page?.title ?? '概览'} · ${settings.branding.name}`; window.scrollTo(0, 0); }, [page, settings.branding.name]);
   if (!page) return null;
-  return <AppShell><Suspense fallback={null}><page.Page key={path} /></Suspense></AppShell>;
+  return (
+    <AppShell>
+      <ErrorBoundary resetKey={path}><Suspense fallback={<PageSkeleton />}><page.Page key={path} /></Suspense></ErrorBoundary>
+    </AppShell>
+  );
+}
+
+// Shown while a lazily loaded page arrives: the overview's layout in outline, so the screen is never empty.
+function PageSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="正在加载">
+      <Skeleton className="h-4 w-28" /><Skeleton className="mt-3 h-8 w-64" /><Skeleton className="mt-3 mb-7 h-4 w-80 max-w-full" />
+      <Skeleton className="h-[390px] rounded-xl" />
+      <div className="mt-4 grid gap-4 lg:grid-cols-5"><Skeleton className="h-64 rounded-xl lg:col-span-2" /><Skeleton className="h-64 rounded-xl lg:col-span-3" /></div>
+    </div>
+  );
 }
 
 function ForcePassword() {
@@ -50,9 +70,7 @@ function ForcePassword() {
   useEffect(() => { document.title = `设置新密码 · ${settings.branding.name}`; }, [settings.branding.name]);
   const branding = { ...settings.branding, products: settings.branding.showProducts ? settings.products : [] };
   return (
-    <AuthLayout branding={branding}>
-      <h1 className="font-display text-[28px] leading-tight font-bold">设置新密码</h1>
-      <p className="mt-1.5 mb-8 text-sm text-muted">账号 {session.username} 正在使用初始密码，设置新密码后需要重新登录。</p>
+    <AuthLayout branding={branding} title="设置新密码" subtitle={<>账号 {session.username} 正在使用初始密码，设置后需要重新登录</>}>
       <AccountForm forced />
       <Button variant="ghost" className="mt-3 w-full" onClick={async () => { try { await api('/api/logout', 'POST', {}); } catch { /* ignore */ } signOut(); }}>退出登录</Button>
     </AuthLayout>
